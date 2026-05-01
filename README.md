@@ -603,3 +603,4 @@ The upstream Hermes README and release notes are kept under `docs/upstream/` for
 This repository preserves the upstream Hermes Agent license. See [LICENSE](LICENSE).
 
 RunbookHermes additions follow the same repository license unless otherwise stated.
+
