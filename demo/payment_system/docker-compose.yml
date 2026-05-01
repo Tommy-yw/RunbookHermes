@@ -1,0 +1,120 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: payments
+      MYSQL_USER: payment
+      MYSQL_PASSWORD: payment
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  payment-service:
+    build: ./services/payment_service
+    environment:
+      SERVICE_NAME: payment-service
+      SERVICE_PORT: 8080
+      ORDER_SERVICE_URL: http://order-service:8081
+      COUPON_SERVICE_URL: http://coupon-service:8082
+      MYSQL_HOST: mysql
+      MYSQL_USER: payment
+      MYSQL_PASSWORD: payment
+      MYSQL_DATABASE: payments
+      REDIS_URL: redis://redis:6379/0
+      PAYMENT_VERSION_FILE: /app/runtime/payment-service-version.txt
+      DEMO_FAULT_MODE: ${DEMO_FAULT_MODE:-PAYMENT_503_AFTER_DEPLOY}
+      JAEGER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+      LOG_FILE: /var/log/runbook/payment-service.log
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../../data/payment_demo/runtime:/app/runtime
+      - ./logs:/var/log/runbook
+    depends_on:
+      - mysql
+      - redis
+      - order-service
+      - coupon-service
+      - jaeger
+
+  order-service:
+    build: ./services/order_service
+    environment:
+      SERVICE_NAME: order-service
+      SERVICE_PORT: 8081
+      REDIS_URL: redis://redis:6379/0
+      JAEGER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+      LOG_FILE: /var/log/runbook/order-service.log
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./logs:/var/log/runbook
+    depends_on:
+      - redis
+      - jaeger
+
+  coupon-service:
+    build: ./services/coupon_service
+    environment:
+      SERVICE_NAME: coupon-service
+      SERVICE_PORT: 8082
+      JAEGER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+      LOG_FILE: /var/log/runbook/coupon-service.log
+    ports:
+      - "8082:8082"
+    volumes:
+      - ./logs:/var/log/runbook
+    depends_on:
+      - jaeger
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=6h"]
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - payment-service
+      - order-service
+      - coupon-service
+
+  loki:
+    image: grafana/loki:2.9.8
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+
+  promtail:
+    image: grafana/promtail:2.9.8
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - ./logs:/var/log/runbook
+    depends_on:
+      - loki
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"
+      - "4318:4318"
+
+  grafana:
+    image: grafana/grafana:10.4.6
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+      - loki

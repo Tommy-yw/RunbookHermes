@@ -1,0 +1,42 @@
+{
+  "items": [
+    {
+      "evidence_id": "ev_log_pool_exhausted",
+      "source": "loki",
+      "service": "payment-service",
+      "summary": "connection pool exhausted while creating payment record",
+      "matched_terms": [
+        "connection pool exhausted"
+      ],
+      "count": 42,
+      "raw_ref": "loki://payment-service/connection-pool-exhausted",
+      "confidence": 0.9
+    },
+    {
+      "evidence_id": "ev_log_coupon_timeout",
+      "source": "loki",
+      "service": "payment-service",
+      "summary": "coupon-service request timed out after 500 ms; payment-service returned HTTP 504",
+      "matched_terms": [
+        "coupon-service timeout",
+        "HTTP 504"
+      ],
+      "count": 12,
+      "raw_ref": "loki://payment-service/coupon-timeout",
+      "confidence": 0.78
+    },
+    {
+      "evidence_id": "ev_log_order_rate_limit",
+      "source": "loki",
+      "service": "payment-service",
+      "summary": "order-service reservation returned HTTP 429 rate_limit_exceeded",
+      "matched_terms": [
+        "HTTP 429",
+        "rate_limit_exceeded"
+      ],
+      "count": 8,
+      "raw_ref": "loki://payment-service/order-rate-limit",
+      "confidence": 0.7
+    }
+  ]
+}

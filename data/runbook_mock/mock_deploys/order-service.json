@@ -1,0 +1,14 @@
+{
+  "items": [
+    {
+      "evidence_id": "ev_deploy_order_no_recent_release",
+      "source": "deploy",
+      "service": "order-service",
+      "summary": "No order-service deployment in the last 2 hours; rate-limit configuration or traffic surge is more likely.",
+      "version": "v3.4.2",
+      "previous_version": "v3.4.1",
+      "raw_ref": "deploy://order-service/no-recent-release",
+      "confidence": 0.66
+    }
+  ]
+}

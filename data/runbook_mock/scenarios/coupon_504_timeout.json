@@ -1,0 +1,7 @@
+{
+  "service": "payment-service",
+  "severity": "p2",
+  "environment": "prod",
+  "alert_name": "coupon_504_timeout",
+  "summary": "payment-service HTTP 504 responses increased while waiting for coupon-service"
+}

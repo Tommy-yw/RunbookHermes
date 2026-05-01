@@ -1,0 +1,15 @@
+{
+  "items": [
+    {
+      "evidence_id": "ev_trace_order_rate_limit",
+      "source": "trace",
+      "service": "order-service",
+      "downstream": "reservation-rate-limiter",
+      "p95_ms": 210,
+      "error_count": 8,
+      "summary": "Trace spans show reservation-rate-limiter rejecting requests with HTTP 429.",
+      "raw_ref": "jaeger://order-service/rate-limit",
+      "confidence": 0.75
+    }
+  ]
+}

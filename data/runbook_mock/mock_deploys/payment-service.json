@@ -1,0 +1,17 @@
+{
+  "items": [
+    {
+      "evidence_id": "ev_deploy_v231",
+      "source": "deploy",
+      "service": "payment-service",
+      "version": "v2.3.1",
+      "previous_version": "v2.3.0",
+      "deployed_at": "2026-04-26T10:00:00Z",
+      "operator": "release-bot",
+      "scope": "canary",
+      "summary": "payment-service v2.3.1 was deployed to canary shortly before HTTP 503 errors increased",
+      "raw_ref": "deploy://payment-service/v2.3.1",
+      "confidence": 0.94
+    }
+  ]
+}

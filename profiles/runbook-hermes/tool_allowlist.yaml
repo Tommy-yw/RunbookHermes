@@ -1,0 +1,23 @@
+allowed_tools:
+  - prom_query
+  - prom_top_anomalies
+  - loki_query
+  - trace_search
+  - recent_deploys
+  - rollback_canary
+  - incident_rca_guard
+  - action_policy_guard
+  - runbook_approval_decision
+blocked_tools:
+  - browser_automation
+  - execute_code
+  - arbitrary_shell
+  - arbitrary_file_write
+  - arbitrary_sql
+  - kubectl_unrestricted
+risk:
+  rollback_canary:
+    risk_level: destructive
+    requires_approval: true
+    checkpoint_before_execution: true
+    dry_run_default: true

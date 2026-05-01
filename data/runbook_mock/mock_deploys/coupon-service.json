@@ -1,0 +1,14 @@
+{
+  "items": [
+    {
+      "evidence_id": "ev_deploy_coupon_no_recent_release",
+      "source": "deploy",
+      "service": "coupon-service",
+      "summary": "No coupon-service deployment in the last 2 hours; timeout is less likely to be a direct release regression.",
+      "version": "v1.8.4",
+      "previous_version": "v1.8.3",
+      "raw_ref": "deploy://coupon-service/no-recent-release",
+      "confidence": 0.66
+    }
+  ]
+}

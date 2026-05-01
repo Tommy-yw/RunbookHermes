@@ -1,0 +1,24 @@
+{
+  "services": {
+    "payment-service": {
+      "current_version": "v2.3.1",
+      "previous_version": "v2.3.0",
+      "history": [
+        {
+          "evidence_id": "ev_deploy_payment_demo_v231",
+          "source": "deploy",
+          "service": "payment-service",
+          "version": "v2.3.1",
+          "previous_version": "v2.3.0",
+          "deployed_at": "2026-04-26T10:00:00Z",
+          "operator": "payment-demo-compose",
+          "scope": "demo",
+          "summary": "payment-service v2.3.1 is active in the local payment demo and is configured to return HTTP 503 in DB-pool fault mode.",
+          "raw_ref": "deploy://payment-demo/payment-service/v2.3.1",
+          "confidence": 0.96
+        }
+      ]
+    }
+  },
+  "last_updated": "2026-04-26T10:00:00Z"
+}

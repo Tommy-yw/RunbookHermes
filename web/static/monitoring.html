@@ -1,0 +1,117 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>RunbookHermes - Monitoring</title>
+  <link rel="stylesheet" href="/web/styles.css" />
+</head>
+<body>
+<script src="/web/app.js"></script>
+<script>
+shell("monitoring", `
+  <div class="topbar">
+    <div>
+      <h1 class="page-title">实时监控系统</h1>
+      <p class="page-subtitle">面向 RunbookHermes 的多维度观测大盘：服务健康、HTTP 状态码、延迟、QPS、日志、Trace、发布状态和排障入口统一展示。</p>
+    </div>
+    <div class="toolbar">
+      <button onclick="loadMonitoring()">Refresh</button>
+      <button class="secondary" onclick="toggleAutoRefresh()" id="auto-btn">Auto refresh off</button>
+      <a class="button secondary" href="/web/incidents.html">Incident 工作台</a>
+    </div>
+  </div>
+
+  <section class="grid-4" id="monitor-kpis"></section>
+
+  <section class="monitor-grid">
+    <div>
+      <div class="card">
+        <div class="split"><h2>服务健康矩阵</h2><span id="monitor-mode" class="muted"></span></div>
+        <div id="service-grid" class="grid"></div>
+      </div>
+      <div class="card">
+        <div class="split"><h2>趋势图</h2><span class="muted">HTTP error rate / latency / QPS</span></div>
+        <div id="trend-grid" class="grid"></div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h2>服务拓扑</h2>
+        <div id="topology" class="topology"></div>
+      </div>
+      <div class="card">
+        <h2>发布状态</h2>
+        <div id="deploy-state"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid-2">
+    <div class="card">
+      <h2>日志信号</h2>
+      <div id="log-stream" class="log-stream"></div>
+    </div>
+    <div class="card">
+      <h2>Trace 信号</h2>
+      <div id="trace-stream" class="log-stream"></div>
+    </div>
+  </section>
+`);
+let autoTimer = null;
+function toggleAutoRefresh() {
+  const btn = document.getElementById("auto-btn");
+  if (autoTimer) {
+    clearInterval(autoTimer);
+    autoTimer = null;
+    btn.textContent = "Auto refresh off";
+    return;
+  }
+  autoTimer = setInterval(loadMonitoring, 8000);
+  btn.textContent = "Auto refresh on";
+}
+function renderServiceCard(s) {
+  return `<div class="service-card ${healthClass(s.health.state)}">
+    <div class="split"><h3>${esc(s.service)}</h3><div class="health-ring" style="--score:${s.health.score}">${s.health.score}</div></div>
+    <p>${badge(s.health.label, s.health.state)} ${badge("QPS " + num(s.metrics.qps, 1))} ${badge("p95 " + num((s.metrics.p95_latency_seconds || 0) * 1000, 0) + "ms")}</p>
+    ${miniBars(s.metrics)}
+  </div>`;
+}
+function renderTrends(s) {
+  return `<div class="service-card">
+    <div class="split"><h3>${esc(s.service)}</h3>${badge(s.health.label, s.health.state)}</div>
+    <div class="grid">
+      ${sparkline(s.series, "http_503_rate", "HTTP 503", "pct")}
+      ${sparkline(s.series, "http_504_rate", "HTTP 504", "pct")}
+      ${sparkline(s.series, "http_429_rate", "HTTP 429", "pct")}
+      ${sparkline(s.series, "p95_latency_seconds", "p95 latency", "ms")}
+    </div>
+  </div>`;
+}
+async function loadMonitoring() {
+  const data = await api("/monitoring/live");
+  document.getElementById("monitor-kpis").innerHTML = `
+    <div class="kpi"><div class="label">Services</div><div class="num">${data.totals.services}</div></div>
+    <div class="kpi"><div class="label">Critical</div><div class="num">${data.totals.critical}</div></div>
+    <div class="kpi"><div class="label">Degraded</div><div class="num">${data.totals.degraded}</div></div>
+    <div class="kpi"><div class="label">Healthy</div><div class="num">${data.totals.healthy}</div></div>
+  `;
+  document.getElementById("monitor-mode").textContent = `${data.mode.obs_backend} · ${data.mode.trace_provider_kind} · ${new Date(data.generated_at * 1000).toLocaleTimeString()}`;
+  document.getElementById("service-grid").innerHTML = data.services.map(renderServiceCard).join("");
+  document.getElementById("trend-grid").innerHTML = data.services.map(renderTrends).join("");
+  const nodes = data.topology.nodes.map(n => `<div class="node"><b>${esc(n.id)}</b>${badge(n.state, n.state)}</div>`).join("");
+  const edges = data.topology.edges.map(e => `<div class="edge">${esc(e.from)} → ${esc(e.to)} · ${esc(e.label)}</div>`).join("");
+  document.getElementById("topology").innerHTML = nodes + edges;
+  document.getElementById("deploy-state").innerHTML = jsonBlock(data.deploy_state || {});
+  const logs = [];
+  const traces = [];
+  data.services.forEach(s => {
+    (s.evidence.logs || []).slice(0, 3).forEach(x => logs.push({service: s.service, item: x}));
+    (s.evidence.traces || []).slice(0, 3).forEach(x => traces.push({service: s.service, item: x}));
+  });
+  document.getElementById("log-stream").innerHTML = logs.length ? logs.map(x => `<div class="log-line"><b>${esc(x.service)}</b> · ${esc(x.item.summary || "")}</div>`).join("") : `<div class="empty">No log signals returned.</div>`;
+  document.getElementById("trace-stream").innerHTML = traces.length ? traces.map(x => `<div class="log-line"><b>${esc(x.service)}</b> · ${esc(x.item.summary || x.item.raw_ref || "")}</div>`).join("") : `<div class="empty">No trace signals returned.</div>`;
+}
+loadMonitoring().catch(e => toast(e.message));
+</script>
+</body>
+</html>

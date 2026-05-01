@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>RunbookHermes</title>
+  <link rel="stylesheet" href="/web/styles.css" />
+</head>
+<body>
+<script src="/web/app.js"></script>
+<script>
+shell("index", `
+  <div class="topbar hero">
+    <div>
+      <h1 class="page-title">AIOps 控制台</h1>
+    </div>
+    <div class="toolbar">
+      <a class="button" href="/web/incidents.html">进入 Incident 工作台</a>
+      <a class="button secondary" href="/web/monitoring.html">实时监控系统</a>
+      <a class="button secondary" href="/docs">Swagger API</a>
+    </div>
+  </div>
+
+  <section class="grid-4" id="kpis"></section>
+
+  <section class="grid-2">
+    <div class="card">
+      <div class="split"><h2>推荐演示顺序</h2><a href="/web/monitoring.html">查看实时监控 →</a></div>
+      <div class="timeline">
+        <div class="timeline-item"><b>1. 观察实时监控</b><div class="muted">查看 payment、coupon、order 三个服务的 HTTP 503 / 504 / 429、延迟、日志和 Trace 信号。</div></div>
+        <div class="timeline-item"><b>2. 创建支付故障</b><div class="muted">使用 payment-service HTTP 503、coupon-service HTTP 504 或 order-service HTTP 429 场景创建 incident。</div></div>
+        <div class="timeline-item"><b>3. 检查证据链</b><div class="muted">查看 metrics、logs、trace、deploy evidence cards，以及模型摘要。</div></div>
+        <div class="timeline-item"><b>4. 审批高风险动作</b><div class="muted">rollback 必须进入 approval + checkpoint；非 rollback 写操作需要显式 executor backend。</div></div>
+        <div class="timeline-item"><b>5. 验证恢复并沉淀 runbook</b><div class="muted">受控执行后运行 verify recovery，并沉淀为可复用 skill。</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>当前能力边界</h2>
+      <div id="status"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="split"><h2>实时监控预览</h2><a href="/web/monitoring.html">打开完整监控大盘</a></div>
+    <div id="monitor-preview" class="grid"></div>
+  </section>
+`);
+async function load() {
+  const summary = await api("/dashboard/summary");
+  const runtime = await api("/runtime/status");
+  const monitoring = await api("/monitoring/live");
+  document.getElementById("kpis").innerHTML = `
+    <div class="kpi"><div class="label">Incidents</div><div class="num">${summary.totals.incidents}</div></div>
+    <div class="kpi"><div class="label">Pending approvals</div><div class="num">${summary.totals.pending_approvals}</div></div>
+    <div class="kpi"><div class="label">Generated skills</div><div class="num">${summary.totals.skills}</div></div>
+    <div class="kpi"><div class="label">Critical services</div><div class="num">${monitoring.totals.critical}</div></div>
+  `;
+  document.getElementById("status").innerHTML = `
+    <p>${badge("model " + (runtime.model.enabled ? "on" : "off"))}</p>
+    <p>${badge("obs " + runtime.observability.obs_backend)} ${badge("trace " + runtime.observability.trace_provider_kind)}</p>
+    <p>${badge("rollback " + runtime.execution.rollback_backend_kind)} ${badge(runtime.execution.controlled_execution_enabled ? "controlled execution on" : "controlled execution off")}</p>
+    <p class="muted">生产级 Feishu/WeCom、真实发布系统、真实 rollback adapter 需要在 Settings 中配置后启用。</p>
+  `;
+  document.getElementById("monitor-preview").innerHTML = monitoring.services.map(s => `
+    <div class="service-card ${healthClass(s.health.state)}">
+      <div class="split"><h3>${esc(s.service)}</h3>${badge(s.health.label, s.health.state)}</div>
+      ${miniBars(s.metrics)}
+      <p class="muted">p95 latency ${num((s.metrics.p95_latency_seconds || 0) * 1000, 0)}ms · QPS ${num(s.metrics.qps, 1)}</p>
+    </div>
+  `).join("");
+}
+load().catch(e => toast(e.message));
+</script>
+</body>
+</html>

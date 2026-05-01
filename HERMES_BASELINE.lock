@@ -1,0 +1,7 @@
+# RunbookHermes baseline
+source = "https://github.com/NousResearch/hermes-agent"
+source_zip = "hermes-agent-2026.4.23.zip"
+tag = "v2026.4.23"
+release = "Hermes Agent v0.11.0"
+commit_short = "bf196a3"
+runbook_mode = "hermes-native"

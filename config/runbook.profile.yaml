@@ -1,0 +1,12 @@
+# Compatibility copy of profiles/runbook-hermes/config.yaml
+plugins:
+  enabled:
+    - runbook-hermes
+memory:
+  provider: incident_memory
+context:
+  engine: evidence_stack
+approval:
+  mode: manual
+  destructive_requires_approval: true
+  checkpoint_before_destructive: true

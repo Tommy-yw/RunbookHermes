@@ -1,0 +1,111 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>RunbookHermes - Incidents</title>
+  <link rel="stylesheet" href="/web/styles.css" />
+</head>
+<body>
+<script src="/web/app.js"></script>
+<script>
+shell("incidents", `
+  <div class="topbar">
+    <div>
+      <p class="eyebrow">Incident command center</p>
+      <h1 class="page-title">Incident List</h1>
+      <p class="page-subtitle">从 Web、Alertmanager、飞书或企微进入的故障都会归一化为 RunbookHermes incident。这里展示服务、状态、根因、审批和恢复进展。</p>
+    </div>
+    <div class="toolbar">
+      <button onclick="loadIncidents()">Refresh</button>
+      <button class="secondary" onclick="document.getElementById('create-card').scrollIntoView({behavior:'smooth'})">Create</button>
+    </div>
+  </div>
+
+  <section class="grid-3" id="kpis"></section>
+
+  <section class="card" id="create-card">
+    <div class="split"><h2>Create Incident</h2><span class="muted">payment demo scenarios</span></div>
+    <div class="toolbar" id="scenario-buttons"></div>
+    <label>Summary</label>
+    <textarea id="summary">payment-service 发布后 HTTP 503 飙升，请先查证据、判断根因，并告诉我是否需要回滚。</textarea>
+    <div class="grid">
+      <div><label>Service</label><input id="service" value="payment-service" /></div>
+      <div><label>Severity</label><select id="severity"><option>p1</option><option>p2</option><option>p3</option></select></div>
+      <div><label>Environment</label><input id="environment" value="prod" /></div>
+    </div>
+    <button onclick="createIncident()">Create Incident</button>
+    <span id="create-status" class="muted"></span>
+  </section>
+
+  <section class="card">
+    <div class="split">
+      <h2>Incidents</h2>
+      <div class="toolbar">
+        <select id="status-filter" onchange="renderTable()"><option value="">All status</option><option value="approval_pending">approval_pending</option><option value="completed">completed</option></select>
+        <input id="search" oninput="renderTable()" placeholder="Search service, root cause, status..." style="max-width:320px" />
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>ID</th><th>Service</th><th>Status</th><th>Severity</th><th>Root cause</th><th>Created</th></tr></thead>
+      <tbody id="incident-rows"></tbody>
+    </table>
+  </section>
+`);
+let allIncidents = [];
+async function loadSummary() {
+  const s = await api("/dashboard/summary");
+  document.getElementById("kpis").innerHTML = `
+    <div class="kpi"><div class="label">Total incidents</div><div class="num">${s.totals.incidents}</div></div>
+    <div class="kpi"><div class="label">Pending approvals</div><div class="num">${s.totals.pending_approvals}</div></div>
+    <div class="kpi"><div class="label">Generated skills</div><div class="num">${s.totals.skills}</div></div>
+  `;
+}
+async function loadScenarios() {
+  const scenarios = await api("/demo/scenarios");
+  document.getElementById("scenario-buttons").innerHTML = scenarios.map(sc => `
+    <button class="ghost" onclick="createScenario('${sc.scenario_id}')">${esc(sc.alert_name || sc.scenario_id)}</button>
+  `).join("");
+}
+async function createScenario(id) {
+  const incident = await api(`/demo/scenarios/${id}/incident`, { method: "POST", body: "{}" });
+  toast(`Created ${incident.incident_id}`);
+  await loadIncidents();
+}
+async function loadIncidents() {
+  allIncidents = await api("/incidents");
+  renderTable();
+  await loadSummary();
+}
+function renderTable() {
+  const f = document.getElementById("status-filter").value;
+  const q = document.getElementById("search").value.toLowerCase();
+  const rows = document.getElementById("incident-rows");
+  const items = allIncidents.filter(x => (!f || x.status === f) && JSON.stringify(x).toLowerCase().includes(q));
+  rows.innerHTML = items.length ? items.map(x => `
+    <tr>
+      <td><a href="/web/incident.html?id=${x.incident_id}">${short(x.incident_id)}</a></td>
+      <td>${esc(x.service || "-")}</td>
+      <td>${badge(x.status)}</td>
+      <td>${badge(x.severity)}</td>
+      <td>${esc((x.hypothesis || {}).title || x.summary || "-")}</td>
+      <td>${fmtTime(x.created_at)}</td>
+    </tr>`).join("") : `<tr><td colspan="6"><div class="empty">No incidents yet.</div></td></tr>`;
+}
+async function createIncident() {
+  const status = document.getElementById("create-status");
+  status.textContent = "Creating...";
+  const payload = {
+    summary: document.getElementById("summary").value,
+    service: document.getElementById("service").value,
+    severity: document.getElementById("severity").value,
+    environment: document.getElementById("environment").value,
+    source: "web"
+  };
+  const incident = await api("/incidents", { method: "POST", body: JSON.stringify(payload) });
+  status.innerHTML = `Created <a href="/web/incident.html?id=${incident.incident_id}">${incident.incident_id}</a>`;
+  await loadIncidents();
+}
+loadScenarios().then(loadIncidents).catch(e => toast(e.message));
+</script>
+</body>
+</html>

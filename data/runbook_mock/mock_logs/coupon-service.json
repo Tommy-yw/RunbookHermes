@@ -1,0 +1,14 @@
+{
+  "items": [
+    {
+      "evidence_id": "ev_log_coupon_timeout",
+      "source": "loki",
+      "service": "coupon-service",
+      "summary": "coupon validation request exceeded 500 ms and returned HTTP 504 upstream",
+      "matched_terms": ["coupon timeout", "HTTP 504"],
+      "count": 31,
+      "raw_ref": "loki://coupon-service/timeout",
+      "confidence": 0.82
+    }
+  ]
+}

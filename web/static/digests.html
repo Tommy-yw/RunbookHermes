@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>RunbookHermes - Digests</title>
+  <link rel="stylesheet" href="/web/styles.css" />
+</head>
+<body>
+<script src="/web/app.js"></script>
+<script>
+shell("digests", `
+  <div class="topbar">
+    <div>
+      <p class="eyebrow">Operations intelligence</p>
+      <h1 class="page-title">Digests & Skills</h1>
+      <p class="page-subtitle">汇总最近 incident、高频故障类别和生成的 runbook skills。真实定时任务可以调用同一组 API。</p>
+    </div>
+    <div class="toolbar">
+      <button onclick="runDigest('/cron/daily_health_digest')">Daily digest</button>
+      <button class="secondary" onclick="runDigest('/cron/weekly_top_incidents')">Weekly top incidents</button>
+    </div>
+  </div>
+  <section class="grid-3" id="kpis"></section>
+  <section class="grid-2">
+    <div class="card"><h2>Recent Incidents</h2><div id="recent"></div></div>
+    <div class="card"><h2>High-frequency Faults</h2><div id="faults"></div></div>
+  </section>
+  <section class="card"><h2>Generated Runbook Skills</h2><div id="skills"></div></section>
+  <section class="card"><h2>Digest Output</h2><pre id="out"></pre></section>
+`);
+async function load() {
+  const s = await api("/dashboard/summary");
+  document.getElementById("kpis").innerHTML = `
+    <div class="kpi"><div class="label">Incidents</div><div class="num">${s.totals.incidents}</div></div>
+    <div class="kpi"><div class="label">Completed</div><div class="num">${s.totals.completed}</div></div>
+    <div class="kpi"><div class="label">Skills</div><div class="num">${s.totals.skills}</div></div>
+  `;
+  document.getElementById("recent").innerHTML = (s.recent_incidents || []).map(x => `
+    <div class="evidence-card"><div class="split"><a href="/web/incident.html?id=${x.incident_id}">${short(x.incident_id)}</a>${badge(x.status)}</div><p>${esc(x.summary || "")}</p><p class="dim">${fmtTime(x.created_at)}</p></div>
+  `).join("") || `<div class="empty">No recent incidents.</div>`;
+  document.getElementById("faults").innerHTML = Object.entries(s.by_category || {}).map(([k,v]) => `
+    <div class="evidence-card"><div class="split"><b>${esc(k)}</b><span class="badge">${v}</span></div></div>
+  `).join("") || `<div class="empty">No fault categories yet.</div>`;
+  document.getElementById("skills").innerHTML = (s.recent_skills || []).map(sk => `
+    <div class="evidence-card"><div class="split"><b>${esc(sk.title || sk.skill_id)}</b><a href="/skills/${sk.skill_id}/download">Download</a></div><p class="dim">${fmtTime(sk.created_at)}</p></div>
+  `).join("") || `<div class="empty">No generated skills yet.</div>`;
+}
+async function runDigest(path) {
+  const result = await api(path, {method:"POST", body:"{}"});
+  document.getElementById("out").textContent = JSON.stringify(result, null, 2);
+  await load();
+}
+load().catch(e => toast(e.message));
+</script>
+</body>
+</html>

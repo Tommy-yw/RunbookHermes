@@ -1,0 +1,7 @@
+{
+  "service": "payment-service",
+  "severity": "p2",
+  "environment": "prod",
+  "alert_name": "order_429_rate_limit",
+  "summary": "payment-service saw HTTP 429 responses from order-service reservation path"
+}

@@ -1,0 +1,9 @@
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+prometheus-client==0.20.0
+httpx==0.27.0
+PyMySQL==1.1.1
+redis==5.0.4
+opentelemetry-api==1.25.0
+opentelemetry-sdk==1.25.0
+opentelemetry-exporter-otlp-proto-http==1.25.0

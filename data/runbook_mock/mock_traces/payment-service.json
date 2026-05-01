@@ -1,0 +1,40 @@
+{
+  "items": [
+    {
+      "evidence_id": "ev_trace_mysql_latency",
+      "source": "trace",
+      "service": "payment-service",
+      "downstream": "mysql-payment",
+      "summary": "payment-service -> mysql-payment p95 latency reached 1200 ms with error_count=18",
+      "p95_ms": 1200,
+      "error_count": 18,
+      "error_rate": 0.31,
+      "raw_ref": "jaeger://payment-service/mysql-payment",
+      "confidence": 0.87
+    },
+    {
+      "evidence_id": "ev_trace_coupon_timeout",
+      "source": "trace",
+      "service": "payment-service",
+      "downstream": "coupon-service",
+      "summary": "payment-service -> coupon-service spans exceeded 1200 ms and ended as HTTP 504",
+      "p95_ms": 1250,
+      "error_count": 7,
+      "error_rate": 0.12,
+      "raw_ref": "jaeger://payment-service/coupon-service",
+      "confidence": 0.75
+    },
+    {
+      "evidence_id": "ev_trace_order_429",
+      "source": "trace",
+      "service": "payment-service",
+      "downstream": "order-service",
+      "summary": "payment-service -> order-service spans show HTTP 429 responses under reservation load",
+      "p95_ms": 180,
+      "error_count": 11,
+      "error_rate": 0.09,
+      "raw_ref": "jaeger://payment-service/order-service",
+      "confidence": 0.68
+    }
+  ]
+}

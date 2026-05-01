@@ -1,0 +1,31 @@
+# RunbookHermes Hermes profile
+model:
+  provider: custom
+  name: ${RUNBOOK_MODEL_NAME:-openrouter/auto}
+  base_url: ${RUNBOOK_MODEL_BASE_URL:-https://openrouter.ai/api/v1}
+
+plugins:
+  enabled:
+    - runbook-hermes
+
+memory:
+  provider: incident_memory
+
+context:
+  engine: evidence_stack
+
+agent:
+  api_max_retries: 2
+  tool_use_enforcement: true
+
+approval:
+  mode: manual
+  destructive_requires_approval: true
+  checkpoint_before_destructive: true
+
+skills:
+  creation_nudge_interval: 6
+
+tools:
+  enabled_toolsets:
+    - runbook-observability

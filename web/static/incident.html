@@ -1,0 +1,132 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>RunbookHermes - Incident Detail</title>
+  <link rel="stylesheet" href="/web/styles.css" />
+</head>
+<body>
+<script src="/web/app.js"></script>
+<script>
+const id = getParam("id");
+shell("incidents", `
+  <div class="topbar">
+    <div>
+      <p class="eyebrow">Incident detail</p>
+      <h1 class="page-title" id="title">Loading...</h1>
+      <p class="page-subtitle" id="subtitle"></p>
+    </div>
+    <div class="toolbar">
+      <a class="button secondary" href="/web/incidents.html">Back</a>
+      <button onclick="load()">Refresh</button>
+      <button class="ok" onclick="verifyRecovery()">Verify recovery</button>
+    </div>
+  </div>
+
+  <section class="grid-3" id="kpis"></section>
+
+  <section class="card" id="executive"></section>
+
+  <section class="tabs">
+    <button class="tab active" onclick="showTab('evidence')">Evidence</button>
+    <button class="tab" onclick="showTab('rootcause')">Root Cause</button>
+    <button class="tab" onclick="showTab('actions')">Actions</button>
+    <button class="tab" onclick="showTab('timeline')">Timeline</button>
+    <button class="tab" onclick="showTab('skill')">Skill</button>
+    <button class="tab" onclick="showTab('raw')">Raw</button>
+  </section>
+
+  <section class="tab-panel" id="tab-evidence"><div class="grid" id="evidence"></div></section>
+  <section class="tab-panel hidden" id="tab-rootcause"><div class="grid-2"><div class="card" id="hypothesis"></div><div class="card" id="model"></div></div></section>
+  <section class="tab-panel hidden" id="tab-actions"><div class="grid" id="actions"></div><div class="grid" id="approvals"></div><div class="grid" id="checkpoints"></div></section>
+  <section class="tab-panel hidden" id="tab-timeline"><div class="card"><div class="timeline" id="events"></div></div></section>
+  <section class="tab-panel hidden" id="tab-skill"><div id="skills"></div></section>
+  <section class="tab-panel hidden" id="tab-raw"><div class="grid-2"><div class="card"><h2>Incident JSON</h2><pre id="raw-incident"></pre></div><div class="card"><h2>Events JSON</h2><pre id="raw-events"></pre></div></div></section>
+`);
+let incident = {};
+let events = [];
+function showTab(name) {
+  document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+  document.querySelectorAll(".tab-panel").forEach(x => x.classList.add("hidden"));
+  event.target.classList.add("active");
+  document.getElementById("tab-" + name).classList.remove("hidden");
+}
+async function load() {
+  incident = await api(`/incidents/${id}`);
+  events = await api(`/incidents/${id}/events`);
+  const h = incident.hypothesis || {};
+  const a = incident.action || {};
+  document.getElementById("title").innerHTML = `${esc(incident.service)} ${badge(incident.status)} ${badge(incident.severity)}`;
+  document.getElementById("subtitle").textContent = `${incident.summary || ""} · ${incident.incident_id}`;
+  document.getElementById("kpis").innerHTML = `
+    <div class="kpi"><div class="label">Evidence</div><div class="num">${(incident.evidence || []).length}</div></div>
+    <div class="kpi"><div class="label">Confidence</div><div class="num">${Math.round((h.confidence || 0) * 100)}%</div></div>
+    <div class="kpi"><div class="label">Approvals</div><div class="num">${(incident.approvals || []).filter(x => x.status === "pending").length}</div></div>
+  `;
+  document.getElementById("executive").innerHTML = `
+    <div class="split"><h2>Executive Summary</h2><div>${badge(h.category || "unknown")} ${riskBadge(a.risk_level)}</div></div>
+    <p><b>Root cause:</b> ${esc(h.title || "No hypothesis generated")}</p>
+    <p><b>Recommended action:</b> ${esc(a.title || "No action generated")}</p>
+    <p class="muted">Evidence IDs: ${(h.evidence_ids || []).map(esc).join(", ") || "-"}</p>
+  `;
+  document.getElementById("evidence").innerHTML = (incident.evidence || []).map(renderEvidence).join("") || `<div class="empty">No evidence recorded.</div>`;
+  document.getElementById("hypothesis").innerHTML = `
+    <h2>Root Cause Hypothesis</h2>
+    <p>${badge(h.category || "unknown")} ${badge("confidence " + Math.round((h.confidence || 0) * 100) + "%")}</p>
+    <h3>${esc(h.title || "-")}</h3>
+    <p>${esc(h.rationale || "")}</p>
+    <h3>Evidence references</h3>
+    <p>${(h.evidence_ids || []).map(x => `<span class="badge">${esc(x)}</span>`).join(" ") || "-"}</p>
+  `;
+  document.getElementById("model").innerHTML = `
+    <h2>Model-assisted Summary</h2>
+    <p class="muted">Uses the optional OpenAI-compatible model interface. If disabled, the response will explain how to enable it.</p>
+    <button onclick="modelSummary()">Generate summary</button>
+    <pre id="model-output"></pre>
+  `;
+  document.getElementById("actions").innerHTML = `
+    <div class="card">
+      <div class="split"><h2>Action Plan</h2>${riskBadge(a.risk_level)}</div>
+      <h3>${esc(a.title || "-")}</h3>
+      <p>Type: ${badge(a.action_type || "-")} Approval: ${badge(a.requires_approval ? "required" : "not required")}</p>
+      ${jsonBlock(a.args || {})}
+    </div>
+    ${incident.verification ? `<div class="card"><h2>Recovery Verification</h2>${jsonBlock(incident.verification)}</div>` : ""}
+  `;
+  document.getElementById("approvals").innerHTML = `<div class="card"><h2>Approvals</h2>${(incident.approvals || []).map(a => `
+    <div class="evidence-card">
+      <div class="split"><b>${esc(a.approval_id)}</b>${badge(a.status)}</div>
+      <p>Action: ${esc(a.action || "-")}</p>
+      <p>Checkpoint: ${esc(a.checkpoint_id || "-")}</p>
+      ${a.status === "pending" ? `<button class="ok" onclick="decide('${a.approval_id}','approved')">Approve</button><button class="danger" onclick="decide('${a.approval_id}','rejected')">Reject</button>` : ""}
+    </div>`).join("") || `<div class="empty">No approvals.</div>`}</div>`;
+  document.getElementById("checkpoints").innerHTML = `<div class="card"><h2>Checkpoints</h2>${(incident.checkpoints || []).map(c => `
+    <div class="evidence-card"><b>${esc(c.checkpoint_id)}</b><p>${esc(c.action || "")}</p><p class="dim">${fmtTime(c.created_at)}</p></div>
+  `).join("") || `<div class="empty">No checkpoints.</div>`}</div>`;
+  document.getElementById("events").innerHTML = events.map(renderEvent).join("") || `<div class="empty">No events.</div>`;
+  document.getElementById("skills").innerHTML = (incident.skills || []).map(s => `
+    <div class="card"><div class="split"><h2>${esc(s.title || "Generated Skill")}</h2><a class="button secondary" href="/skills/${s.skill_id}/download">Download</a></div><pre>${esc(s.body || "")}</pre></div>
+  `).join("") || `<div class="empty">No generated skill.</div>`;
+  document.getElementById("raw-incident").textContent = JSON.stringify(incident, null, 2);
+  document.getElementById("raw-events").textContent = JSON.stringify(events, null, 2);
+}
+async function decide(approvalId, decision) {
+  await api(`/approvals/${approvalId}/decision`, {method:"POST", body: JSON.stringify({decision, approver:"web", comment:"decision from RunbookHermes web console"})});
+  toast(`Approval ${decision}`);
+  await load();
+}
+async function verifyRecovery() {
+  const result = await api(`/incidents/${id}/verify-recovery`, {method:"POST", body:"{}"});
+  toast(result.status || "verification requested");
+  await load();
+}
+async function modelSummary() {
+  const out = document.getElementById("model-output");
+  out.textContent = "Calling model interface...";
+  const result = await api(`/incidents/${id}/model-summary`);
+  out.textContent = result.content || JSON.stringify(result, null, 2);
+}
+load().catch(e => { document.getElementById("title").textContent = "Error"; document.getElementById("subtitle").textContent = e.message; });
+</script>
+</body>
+</html>

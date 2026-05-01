@@ -1,0 +1,14 @@
+{
+  "items": [
+    {
+      "evidence_id": "ev_log_order_rate_limit",
+      "source": "loki",
+      "service": "order-service",
+      "summary": "reservation path returned HTTP 429 because rate limiter bucket was exhausted",
+      "matched_terms": ["HTTP 429", "rate_limit_exceeded"],
+      "count": 27,
+      "raw_ref": "loki://order-service/rate-limit",
+      "confidence": 0.8
+    }
+  ]
+}

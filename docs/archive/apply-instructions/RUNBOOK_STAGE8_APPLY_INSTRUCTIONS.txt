@@ -1,0 +1,77 @@
+# RunbookHermes Stage 8 / Final Overlay Instructions
+
+This overlay is cumulative. Apply it to the official Hermes source zip directly.
+
+## Apply
+
+```bash
+mkdir runbookhermes-work
+cd runbookhermes-work
+unzip ../hermes-agent-2026.4.23.zip
+unzip -o ../runbook-hermes-hermes-native-overlay-final.zip
+cd hermes-agent-2026.4.23
+```
+
+Do not also apply older RunbookHermes overlays. This final overlay already contains the earlier RunbookHermes profile, tools, web/API, payment demo, real observability adapters, controlled demo rollback, and Stage 8 Web Console.
+
+## Validate without installing Web dependencies
+
+```bash
+PYTHONPATH=. python -S scripts/runbook_validate.py
+PYTHONPATH=. python -S scripts/runbook_gateway_smoke.py
+PYTHONPATH=. python -S scripts/runbook_no_legacy_imports.py
+PYTHONPATH=. python -S scripts/runbook_stage2_4_validate.py
+PYTHONPATH=. python -S scripts/runbook_payment_demo_smoke.py
+PYTHONPATH=. python -S scripts/runbook_stage5_7_validate.py
+PYTHONPATH=. python -S scripts/runbook_stage8_validate.py
+```
+
+`runbook_stage8_validate.py` will skip FastAPI route checks if the optional web dependency is not installed.
+
+## Start Web Console
+
+```bash
+python -m pip install -e ".[web]"
+python -m uvicorn apps.runbook_api.app.main:app --host 127.0.0.1 --port 8000
+```
+
+Open:
+
+- http://127.0.0.1:8000/web/index.html
+- http://127.0.0.1:8000/web/incidents.html
+- http://127.0.0.1:8000/web/approvals.html
+- http://127.0.0.1:8000/web/digests.html
+- http://127.0.0.1:8000/web/settings.html
+- http://127.0.0.1:8000/docs
+
+## Start local payment demo
+
+```bash
+cd demo/payment_system
+docker compose up --build
+```
+
+Generate traffic:
+
+```bash
+python scripts/generate_traffic.py --fault PAYMENT_503_AFTER_DEPLOY --requests 60
+python scripts/generate_traffic.py --fault COUPON_504_TIMEOUT --requests 40
+python scripts/generate_traffic.py --fault ORDER_429_RATE_LIMIT --requests 40
+```
+
+Then run the API with:
+
+```bash
+export OBS_BACKEND=real
+export DEPLOY_BACKEND=demo_file
+export TRACE_BACKEND=jaeger
+export TRACE_PROVIDER_KIND=jaeger
+export ROLLBACK_BACKEND_KIND=demo_file
+export RUNBOOK_CONTROLLED_EXECUTION_ENABLED=true
+export PROMETHEUS_BASE_URL=http://127.0.0.1:9090
+export LOKI_BASE_URL=http://127.0.0.1:3100
+export TRACE_BASE_URL=http://127.0.0.1:16686
+export DEMO_DEPLOY_STATE_FILE=data/payment_demo/deployments.json
+export DEMO_VERSION_FILE=data/payment_demo/runtime/payment-service-version.txt
+python -m uvicorn apps.runbook_api.app.main:app --host 127.0.0.1 --port 8000
+```

@@ -1,0 +1,7 @@
+{
+  "service": "payment-service",
+  "severity": "p1",
+  "environment": "prod",
+  "alert_name": "payment_503_spike",
+  "summary": "payment-service HTTP 503 rate jumped after v2.3.1 release"
+}

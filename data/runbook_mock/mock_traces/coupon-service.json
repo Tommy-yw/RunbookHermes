@@ -1,0 +1,15 @@
+{
+  "items": [
+    {
+      "evidence_id": "ev_trace_coupon_latency",
+      "source": "trace",
+      "service": "coupon-service",
+      "downstream": "redis",
+      "p95_ms": 980,
+      "error_count": 12,
+      "summary": "Trace spans show coupon-service waiting on redis and timing out upstream as HTTP 504.",
+      "raw_ref": "jaeger://coupon-service/timeout",
+      "confidence": 0.77
+    }
+  ]
+}

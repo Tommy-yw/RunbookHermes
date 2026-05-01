@@ -1,0 +1,30 @@
+{
+  "items": [
+    {
+      "evidence_id": "ev_metric_order_http_429_rate",
+      "source": "prometheus",
+      "service": "order-service",
+      "summary": "HTTP 429 rate increased on order reservation path",
+      "metric": "http_429_rate",
+      "value": 0.09,
+      "baseline": 0.004,
+      "severity": "warning",
+      "window": "15m",
+      "raw_ref": "prometheus://order-service/http_429_rate",
+      "confidence": 0.84
+    },
+    {
+      "evidence_id": "ev_metric_order_qps",
+      "source": "prometheus",
+      "service": "order-service",
+      "summary": "reservation path QPS increased during promotion traffic",
+      "metric": "qps",
+      "value": 48.0,
+      "baseline": 18.0,
+      "severity": "warning",
+      "window": "15m",
+      "raw_ref": "prometheus://order-service/qps",
+      "confidence": 0.78
+    }
+  ]
+}

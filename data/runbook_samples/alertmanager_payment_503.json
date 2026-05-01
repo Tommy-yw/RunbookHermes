@@ -1,0 +1,18 @@
+{
+  "status": "firing",
+  "commonLabels": {
+    "service": "payment-service",
+    "severity": "p1",
+    "environment": "prod",
+    "alert_name": "payment_503_spike"
+  },
+  "commonAnnotations": {
+    "summary": "payment-service HTTP 503 rate jumped after v2.3.1 release"
+  },
+  "alerts": [
+    {
+      "startsAt": "2026-04-26T10:00:00Z",
+      "generatorURL": "http://localhost:9090/graph?g0.expr=http_503_rate"
+    }
+  ]
+}

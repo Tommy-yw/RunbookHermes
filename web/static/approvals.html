@@ -1,0 +1,65 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>RunbookHermes - Approvals</title>
+  <link rel="stylesheet" href="/web/styles.css" />
+</head>
+<body>
+<script src="/web/app.js"></script>
+<script>
+shell("approvals", `
+  <div class="topbar">
+    <div>
+      <p class="eyebrow">Human-in-the-loop safety</p>
+      <h1 class="page-title">Approval Center</h1>
+      <p class="page-subtitle">所有高风险动作都会停在这里。审批前必须有 checkpoint；拒绝时默认 fail-closed，不会执行。</p>
+    </div>
+    <div class="toolbar"><button onclick="loadApprovals()">Refresh</button></div>
+  </div>
+  <section class="grid-3" id="kpis"></section>
+  <section class="card">
+    <div class="split">
+      <h2>Approval Queue</h2>
+      <select id="filter" onchange="render()"><option value="">All</option><option value="pending">pending</option><option value="approved">approved</option><option value="rejected">rejected</option></select>
+    </div>
+    <div id="rows"></div>
+  </section>
+`);
+let approvals = [];
+async function loadApprovals() {
+  approvals = await api("/approvals");
+  render();
+}
+function render() {
+  const filter = document.getElementById("filter").value;
+  const items = approvals.filter(a => !filter || a.status === filter);
+  document.getElementById("kpis").innerHTML = `
+    <div class="kpi"><div class="label">Total approvals</div><div class="num">${approvals.length}</div></div>
+    <div class="kpi"><div class="label">Pending</div><div class="num">${approvals.filter(a => a.status === "pending").length}</div></div>
+    <div class="kpi"><div class="label">Approved</div><div class="num">${approvals.filter(a => a.status === "approved").length}</div></div>
+  `;
+  document.getElementById("rows").innerHTML = items.length ? items.map(a => `
+    <div class="card soft">
+      <div class="split">
+        <div>
+          <h3>${esc(a.action || "controlled action")} ${badge(a.status)}</h3>
+          <p class="muted">Approval ${esc(a.approval_id)} · service ${esc(a.service || "-")} · checkpoint ${esc(a.checkpoint_id || "-")}</p>
+        </div>
+        <div>${riskBadge((a.payload || {}).action?.risk_level || (a.action === "rollback_canary" ? "destructive" : "write_safe"))}</div>
+      </div>
+      <p><b>Why approval is required:</b> ${(a.payload || {}).action ? esc((a.payload || {}).action.title || "This action mutates service behavior.") : "Rollback or controlled action may affect traffic and must be explicitly approved."}</p>
+      <details><summary>Payload</summary>${jsonBlock(a.payload || {})}</details>
+      ${a.status === "pending" ? `<div class="toolbar" style="margin-top:12px"><button class="ok" onclick="decide('${a.approval_id}','approved')">Approve</button><button class="danger" onclick="decide('${a.approval_id}','rejected')">Reject</button></div>` : `<p class="muted">Decided by ${esc(a.approver || "-")} at ${fmtTime(a.decided_at)}</p>`}
+    </div>
+  `).join("") : `<div class="empty">No approvals in this filter.</div>`;
+}
+async function decide(id, decision) {
+  await api(`/approvals/${id}/decision`, {method:"POST", body: JSON.stringify({decision, approver:"web-console", comment:"decision from approval center"})});
+  toast(`Approval ${decision}`);
+  await loadApprovals();
+}
+loadApprovals().catch(e => toast(e.message));
+</script>
+</body>
+</html>

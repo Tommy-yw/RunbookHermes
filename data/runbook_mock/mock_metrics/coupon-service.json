@@ -1,0 +1,30 @@
+{
+  "items": [
+    {
+      "evidence_id": "ev_metric_coupon_http_504_rate",
+      "source": "prometheus",
+      "service": "coupon-service",
+      "summary": "HTTP 504 timeout rate increased while coupon validation was slow",
+      "metric": "http_504_rate",
+      "value": 0.11,
+      "baseline": 0.002,
+      "severity": "critical",
+      "window": "15m",
+      "raw_ref": "prometheus://coupon-service/http_504_rate",
+      "confidence": 0.88
+    },
+    {
+      "evidence_id": "ev_metric_coupon_p95_latency",
+      "source": "prometheus",
+      "service": "coupon-service",
+      "summary": "coupon-service p95 latency increased to 1.2 seconds",
+      "metric": "p95_latency_seconds",
+      "value": 1.2,
+      "baseline": 0.18,
+      "severity": "warning",
+      "window": "15m",
+      "raw_ref": "prometheus://coupon-service/p95_latency_seconds",
+      "confidence": 0.82
+    }
+  ]
+}

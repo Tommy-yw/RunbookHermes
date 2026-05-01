@@ -1,0 +1,4 @@
+name: incident_memory
+version: 0.1.0
+description: "RunbookHermes local stable incident memory provider."
+kind: exclusive

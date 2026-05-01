@@ -1,0 +1,29 @@
+RunbookHermes Hermes-native overlay stage2-4 usage
+
+1. Put these two files in the same parent directory:
+   - hermes-agent-2026.4.23.zip
+   - runbook-hermes-hermes-native-overlay-stage2-4.zip
+
+2. Merge:
+   unzip hermes-agent-2026.4.23.zip
+   unzip -o runbook-hermes-hermes-native-overlay-stage2-4.zip
+   cd hermes-agent-2026.4.23
+
+3. Validate:
+   PYTHONPATH=. python -S scripts/runbook_validate.py
+   PYTHONPATH=. python -S scripts/runbook_gateway_smoke.py
+   PYTHONPATH=. python -S scripts/runbook_no_legacy_imports.py
+   PYTHONPATH=. python -S scripts/runbook_stage2_4_validate.py
+   PYTHONPATH=. python -S scripts/runbook_web_api_smoke.py
+
+4. Run Web/API:
+   python -m pip install -e ".[web]"
+   python -m uvicorn apps.runbook_api.app.main:app --host 127.0.0.1 --port 8000
+
+5. Open:
+   http://127.0.0.1:8000/docs
+   http://127.0.0.1:8000/web/incidents.html
+   http://127.0.0.1:8000/web/approvals.html
+   http://127.0.0.1:8000/web/digests.html
+
+This overlay does not remove official Hermes files. It adds RunbookHermes profile, plugin, domain package, web/API layer, model interface shell, and Feishu/WeCom gateway shells.

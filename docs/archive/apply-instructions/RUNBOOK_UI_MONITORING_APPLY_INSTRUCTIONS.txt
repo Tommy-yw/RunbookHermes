@@ -1,0 +1,27 @@
+RunbookHermes final UI + monitoring patch
+
+Apply order:
+1. hermes-agent-2026.4.23.zip
+2. runbook-hermes-hermes-native-overlay-final.zip
+3. runbook-hermes-final-fix-patch.zip
+4. this patch zip
+
+After merging, validate:
+
+  set PYTHONPATH=.
+  python -S scripts/runbook_monitoring_validate.py
+  python -S scripts/runbook_stage8_validate.py
+
+Run Web console:
+
+  python -m pip install -e ".[web]"
+  python -m uvicorn apps.runbook_api.app.main:app --host 127.0.0.1 --port 8000
+
+Open:
+
+  http://127.0.0.1:8000/web/index.html
+  http://127.0.0.1:8000/web/monitoring.html
+  http://127.0.0.1:8000/web/incidents.html
+  http://127.0.0.1:8000/web/approvals.html
+  http://127.0.0.1:8000/web/digests.html
+  http://127.0.0.1:8000/web/settings.html

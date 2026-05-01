@@ -1,0 +1,3 @@
+name: evidence_stack
+version: 0.1.0
+description: "RunbookHermes EvidenceStack context engine for evidence-first incident compression."

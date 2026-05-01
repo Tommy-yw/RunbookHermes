@@ -1,0 +1,16 @@
+name: runbook-hermes
+version: 0.1.0
+description: "RunbookHermes incident response tools for metrics, logs, traces, deploys, RCA guard, action policy and approval gate."
+author: "RunbookHermes"
+provides_tools:
+  - prom_query
+  - prom_top_anomalies
+  - loki_query
+  - trace_search
+  - recent_deploys
+  - rollback_canary
+  - verify_recovery
+  - incident_rca_guard
+  - action_policy_guard
+  - runbook_approval_decision
+  - execute_controlled_action

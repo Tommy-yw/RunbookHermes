@@ -1,0 +1,64 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>RunbookHermes - Settings</title>
+  <link rel="stylesheet" href="/web/styles.css" />
+</head>
+<body>
+<script src="/web/app.js"></script>
+<script>
+shell("settings", `
+  <div class="topbar">
+    <div>
+      <p class="eyebrow">Integration readiness</p>
+      <h1 class="page-title">Settings & Interface Status</h1>
+      <p class="page-subtitle">这里不暴露密钥，只展示接口是否已配置。生产接入时请通过环境变量配置模型、飞书、企微、Prometheus、Loki、Trace 和执行后端。</p>
+    </div>
+    <div class="toolbar"><button onclick="load()">Refresh</button></div>
+  </div>
+  <section class="grid-3" id="status-cards"></section>
+  <section class="grid-2">
+    <div class="card"><h2>How to enable model</h2><pre>RUNBOOK_MODEL_ENABLED=true
+RUNBOOK_MODEL_BASE_URL=https://your-openai-compatible-endpoint/v1
+RUNBOOK_MODEL_API_KEY=...
+RUNBOOK_MODEL_NAME=your-cheap-model
+RUNBOOK_MODEL_TEMPERATURE=0</pre></div>
+    <div class="card"><h2>How to enable local payment demo observability</h2><pre>OBS_BACKEND=real
+DEPLOY_BACKEND=demo_file
+TRACE_BACKEND=jaeger
+TRACE_PROVIDER_KIND=jaeger
+ROLLBACK_BACKEND_KIND=demo_file
+RUNBOOK_CONTROLLED_EXECUTION_ENABLED=true
+PROMETHEUS_BASE_URL=http://127.0.0.1:9090
+LOKI_BASE_URL=http://127.0.0.1:3100
+TRACE_BASE_URL=http://127.0.0.1:16686</pre></div>
+  </section>
+  <section class="grid-2">
+    <div class="card"><h2>Feishu interface</h2><pre>FEISHU_APP_ID=
+FEISHU_APP_SECRET=
+FEISHU_VERIFICATION_TOKEN=
+FEISHU_ENCRYPT_KEY=
+FEISHU_CALLBACK_BASE_URL=
+FEISHU_BOT_WEBHOOK_URL=
+FEISHU_BOT_SECRET=</pre><p class="muted">Routes: /gateway/feishu/events and /gateway/feishu/card-callback.</p></div>
+    <div class="card"><h2>Production execution shell</h2><pre>ACTION_EXECUTION_BACKEND=custom_http|kubernetes|argocd
+ACTION_EXECUTION_API_BASE_URL=
+ACTION_EXECUTION_API_TOKEN=
+ACTION_EXECUTION_TIMEOUT_SECONDS=5</pre><p class="muted">Non-rollback write actions stay blocked until an executor backend is explicitly configured.</p></div>
+  </section>
+  <section class="card"><h2>Raw Runtime Status</h2><pre id="raw"></pre></section>
+`);
+async function load() {
+  const s = await api("/runtime/status");
+  document.getElementById("status-cards").innerHTML = `
+    <div class="kpi"><div class="label">Model</div><div class="num">${s.model.enabled ? "ON" : "OFF"}</div><div>${badge(s.model.api_key_configured ? "key configured" : "key missing")}</div></div>
+    <div class="kpi"><div class="label">Observability</div><div class="num">${esc(s.observability.obs_backend)}</div><div>${badge(s.observability.prometheus_configured ? "prometheus on" : "prometheus missing")}</div></div>
+    <div class="kpi"><div class="label">Execution</div><div class="num">${s.execution.controlled_execution_enabled ? "ON" : "OFF"}</div><div>${badge(s.execution.action_execution_backend)}</div></div>
+  `;
+  document.getElementById("raw").textContent = JSON.stringify(s, null, 2);
+}
+load().catch(e => toast(e.message));
+</script>
+</body>
+</html>

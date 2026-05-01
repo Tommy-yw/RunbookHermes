@@ -1,0 +1,9 @@
+{
+  "event": {
+    "event_type": "approve_or_reject_action",
+    "approval_id": "approval_demo",
+    "decision": "approved",
+    "user_id": "u_demo",
+    "user_name": "demo-user"
+  }
+}

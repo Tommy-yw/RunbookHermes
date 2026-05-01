@@ -1,0 +1,56 @@
+{
+  "items": [
+    {
+      "evidence_id": "ev_metric_http_503_rate",
+      "source": "prometheus",
+      "service": "payment-service",
+      "summary": "HTTP 503 rate increased to 18% after v2.3.1 rollout",
+      "metric": "http_503_rate",
+      "value": 0.18,
+      "baseline": 0.01,
+      "severity": "critical",
+      "window": "15m",
+      "raw_ref": "prometheus://payment-service/http_503_rate",
+      "confidence": 0.92
+    },
+    {
+      "evidence_id": "ev_metric_p95_latency",
+      "source": "prometheus",
+      "service": "payment-service",
+      "summary": "p95 latency increased to 1.8 seconds",
+      "metric": "p95_latency_seconds",
+      "value": 1.8,
+      "baseline": 0.23,
+      "severity": "warning",
+      "window": "15m",
+      "raw_ref": "prometheus://payment-service/p95_latency_seconds",
+      "confidence": 0.85
+    },
+    {
+      "evidence_id": "ev_metric_http_504_rate",
+      "source": "prometheus",
+      "service": "payment-service",
+      "summary": "HTTP 504 rate is observable when coupon-service timeout mode is enabled",
+      "metric": "http_504_rate",
+      "value": 0.06,
+      "baseline": 0.0,
+      "severity": "warning",
+      "window": "15m",
+      "raw_ref": "prometheus://payment-service/http_504_rate",
+      "confidence": 0.7
+    },
+    {
+      "evidence_id": "ev_metric_http_429_rate",
+      "source": "prometheus",
+      "service": "payment-service",
+      "summary": "HTTP 429 rate is observable when order-service rate-limit mode is enabled",
+      "metric": "http_429_rate",
+      "value": 0.04,
+      "baseline": 0.0,
+      "severity": "warning",
+      "window": "15m",
+      "raw_ref": "prometheus://payment-service/http_429_rate",
+      "confidence": 0.65
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: payment-demo
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["payment-service:8080"]
+        labels:
+          service: payment-service
+      - targets: ["order-service:8081"]
+        labels:
+          service: order-service
+      - targets: ["coupon-service:8082"]
+        labels:
+          service: coupon-service
