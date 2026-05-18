@@ -105,13 +105,23 @@ async function load() {
   `).join("") || `<div class="empty">No checkpoints.</div>`}</div>`;
   document.getElementById("events").innerHTML = events.map(renderEvent).join("") || `<div class="empty">No events.</div>`;
   document.getElementById("skills").innerHTML = (incident.skills || []).map(s => `
-    <div class="card"><div class="split"><h2>${esc(s.title || "Generated Skill")}</h2><a class="button secondary" href="/skills/${s.skill_id}/download">Download</a></div><pre>${esc(s.body || "")}</pre></div>
+    <div class="card"><div class="split"><h2>${esc(s.title || "Generated Skill")}</h2><a class="button secondary" href="#" data-skill-id="${esc(s.skill_id)}" onclick="downloadSkill(this.dataset.skillId); return false;">Download</a></div><pre>${esc(s.body || "")}</pre></div>
   `).join("") || `<div class="empty">No generated skill.</div>`;
   document.getElementById("raw-incident").textContent = JSON.stringify(incident, null, 2);
   document.getElementById("raw-events").textContent = JSON.stringify(events, null, 2);
 }
 async function decide(approvalId, decision) {
-  await api(`/approvals/${approvalId}/decision`, {method:"POST", body: JSON.stringify({decision, approver:"web", comment:"decision from RunbookHermes web console"})});
+  const payload = {decision, approver:"web", comment:"decision from RunbookHermes web console"};
+  if (decision === "approved") {
+    const confirmed = window.confirm("Second confirmation: approve and hand off this action to the configured executor? Rollback actions still use checkpoints; non-rollback production mutations also require executor allowlist gates.");
+    if (!confirmed) return;
+    const token = window.prompt("Type CONFIRM_EXECUTE, or your configured ACTION_EXECUTION_CONFIRMATION_TOKEN:", "CONFIRM_EXECUTE");
+    if (token === null || !token.trim()) return;
+    payload.confirm_execution = true;
+    payload.confirmation_token = token.trim();
+    payload.comment = "second confirmation supplied from RunbookHermes web console";
+  }
+  await api(`/approvals/${approvalId}/decision`, {method:"POST", body: JSON.stringify(payload)});
   toast(`Approval ${decision}`);
   await load();
 }

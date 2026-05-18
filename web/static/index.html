@@ -16,6 +16,11 @@ shell("index", `
     <div class="toolbar">
       <a class="button" href="/web/incidents.html">进入 Incident 工作台</a>
       <a class="button secondary" href="/web/monitoring.html">实时监控系统</a>
+      <a class="button secondary" href="/web/memory.html">自进化记忆</a>
+      <a class="button secondary" href="/web/rag.html">RAG 知识库</a>
+      <a class="button secondary" href="/web/eval.html">Benchmark/Eval</a>
+      <a class="button secondary" href="/web/training.html">训练闭环</a>
+      <a class="button secondary" href="/web/multimodal.html">多模态证据</a>
       <a class="button secondary" href="/docs">Swagger API</a>
     </div>
   </div>
@@ -31,6 +36,8 @@ shell("index", `
         <div class="timeline-item"><b>3. 检查证据链</b><div class="muted">查看 metrics、logs、trace、deploy evidence cards，以及模型摘要。</div></div>
         <div class="timeline-item"><b>4. 审批高风险动作</b><div class="muted">rollback 必须进入 approval + checkpoint；非 rollback 写操作需要显式 executor backend。</div></div>
         <div class="timeline-item"><b>5. 验证恢复并沉淀 runbook</b><div class="muted">受控执行后运行 verify recovery，并沉淀为可复用 skill。</div></div>
+        <div class="timeline-item"><b>6. 记忆自进化</b><div class="muted">自动沉淀 incident summary、fault pattern、team preference，并用 FTS5 + HRR 在下一次事故中召回。</div></div>
+        <div class="timeline-item"><b>7. 分页增强能力</b><div class="muted">分别打开 RAG 知识库、Benchmark/Eval、Training/RL 和 Multimodal 页面：导入 SRE 文档，运行 RCA/action/safety benchmark，生成训练数据，并接入 Grafana、飞书卡片、拓扑图和日志截图证据。</div></div>
       </div>
     </div>
     <div class="card">
@@ -58,6 +65,8 @@ async function load() {
     <p>${badge("model " + (runtime.model.enabled ? "on" : "off"))}</p>
     <p>${badge("obs " + runtime.observability.obs_backend)} ${badge("trace " + runtime.observability.trace_provider_kind)}</p>
     <p>${badge("rollback " + runtime.execution.rollback_backend_kind)} ${badge(runtime.execution.controlled_execution_enabled ? "controlled execution on" : "controlled execution off")}</p>
+    <p>${badge(runtime.memory?.enabled ? "memory on" : "memory off")} ${badge("hrr " + (runtime.memory?.hrr_dim || "-"))}</p>
+    <p>${badge(runtime.rag?.enabled ? "rag on" : "rag off")} ${badge(runtime.multimodal?.enabled ? "multimodal on" : "multimodal off")} ${badge(runtime.api_auth?.enabled ? "api auth on" : "api auth off")}</p>
     <p class="muted">生产级 Feishu/WeCom、真实发布系统、真实 rollback adapter 需要在 Settings 中配置后启用。</p>
   `;
   document.getElementById("monitor-preview").innerHTML = monitoring.services.map(s => `

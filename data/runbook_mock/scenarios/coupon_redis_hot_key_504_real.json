@@ -1,0 +1,7 @@
+{
+  "service": "payment-service",
+  "severity": "p2",
+  "environment": "prod",
+  "alert_name": "coupon_redis_hot_key_504_real",
+  "summary": "payment-service HTTP 504 increase while coupon-service waits on Redis hot key during coupon validation timeout"
+}

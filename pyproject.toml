@@ -21,6 +21,7 @@ dependencies = [
   "tenacity>=9.1.4,<10",
   "pyyaml>=6.0.2,<7",
   "requests>=2.33.0,<3",  # CVE-2026-25645
+  "cryptography>=42.0.0,<47",
   "jinja2>=3.1.5,<4",
   "pydantic>=2.12.5,<3",
   # Interactive CLI (prompt_toolkit is used directly by cli.py)
@@ -80,6 +81,7 @@ dingtalk = ["dingtalk-stream>=0.20,<1", "alibabacloud-dingtalk>=2.0.0", "qrcode>
 feishu = ["lark-oapi>=1.5.3,<2", "qrcode>=7.0,<8"]
 web = ["fastapi>=0.104.0,<1", "uvicorn[standard]>=0.24.0,<1"]
 runbook-demo = ["fastapi>=0.104.0,<1", "uvicorn[standard]>=0.24.0,<1", "prometheus-client>=0.20.0,<1", "httpx>=0.27.0,<1", "PyMySQL>=1.1.0,<2", "redis>=5.0.0,<6", "opentelemetry-api>=1.25.0,<2", "opentelemetry-sdk>=1.25.0,<2", "opentelemetry-exporter-otlp-proto-http>=1.25.0,<2"]
+runbook-postgres = ["psycopg[binary]>=3.1,<4"]
 rl = [
   "atroposlib @ git+https://github.com/NousResearch/atropos.git@c20c85256e5a45ad31edf8b7276e9c5ee1995a30",
   "tinker @ git+https://github.com/thinking-machines-lab/tinker.git@30517b667f18a3dfb7ef33fb56cf686d5820ba2b",
@@ -121,6 +123,7 @@ hermes-agent = "run_agent:main"
 hermes-acp = "acp_adapter.entry:main"
 
 [tool.setuptools]
+include-package-data = false
 py-modules = ["run_agent", "model_tools", "toolsets", "batch_runner", "trajectory_compressor", "toolset_distributions", "cli", "hermes_constants", "hermes_state", "hermes_time", "hermes_logging", "rl_cli", "utils"]
 
 [tool.setuptools.package-data]
@@ -128,6 +131,49 @@ hermes_cli = ["web_dist/**/*"]
 
 [tool.setuptools.packages.find]
 include = ["agent", "agent.*", "tools", "tools.*", "hermes_cli", "gateway", "gateway.*", "tui_gateway", "tui_gateway.*", "cron", "acp_adapter", "plugins", "plugins.*", "runbook_hermes", "runbook_hermes.*", "integrations", "integrations.*", "toolservers", "toolservers.*", "apps", "apps.*"]
+exclude = ["build", "build.*", "dist", "dist.*", "*.egg-info", "*.egg-info.*", "tinker-atropos", "tinker-atropos.*"]
+
+[tool.setuptools.data-files]
+"share/hermes-agent" = ["HERMES_BASELINE.lock", ".env.example", ".env.runbook.example", "README.md", "SECURITY.md"]
+"share/hermes-agent/data/runbook_mock/mock_metrics" = ["data/runbook_mock/mock_metrics/*.json"]
+"share/hermes-agent/data/runbook_mock/mock_logs" = ["data/runbook_mock/mock_logs/*.json"]
+"share/hermes-agent/data/runbook_mock/mock_traces" = ["data/runbook_mock/mock_traces/*.json"]
+"share/hermes-agent/data/runbook_mock/mock_deploys" = ["data/runbook_mock/mock_deploys/*.json"]
+"share/hermes-agent/data/runbook_mock/scenarios" = ["data/runbook_mock/scenarios/*.json"]
+"share/hermes-agent/data/runbook_samples" = ["data/runbook_samples/*.json"]
+"share/hermes-agent/data/runbook_benchmark" = ["data/runbook_benchmark/*.json"]
+"share/hermes-agent/data/payment_demo" = ["data/payment_demo/*.json"]
+"share/hermes-agent/data/payment_demo/runtime" = ["data/payment_demo/runtime/*.txt"]
+"share/hermes-agent/demo/payment_system" = ["demo/payment_system/README.md", "demo/payment_system/docker-compose.yml"]
+"share/hermes-agent/profiles/runbook-hermes" = ["profiles/runbook-hermes/.env.example", "profiles/runbook-hermes/README.md", "profiles/runbook-hermes/SOUL.md", "profiles/runbook-hermes/config.yaml", "profiles/runbook-hermes/tool_allowlist.yaml"]
+"share/hermes-agent/plugins/runbook-hermes" = ["plugins/runbook-hermes/__init__.py", "plugins/runbook-hermes/plugin.yaml"]
+"share/hermes-agent/plugins/memory/runbook_hermes" = ["plugins/memory/runbook_hermes/__init__.py", "plugins/memory/runbook_hermes/plugin.yaml", "plugins/memory/runbook_hermes/README.md"]
+"share/hermes-agent/skills/runbooks/common-incident-triage" = ["skills/runbooks/common-incident-triage/*.md"]
+"share/hermes-agent/skills/runbooks/payment-503-spike" = ["skills/runbooks/payment-503-spike/*.md"]
+"share/hermes-agent/web/static" = ["web/static/*.html", "web/static/*.css", "web/static/*.js"]
+"share/hermes-agent/docs/runbook-hermes" = ["docs/runbook-hermes/*.md"]
+"share/hermes-agent/docs/deployment" = ["docs/deployment/*.md"]
+"share/hermes-agent/docs/integrations" = ["docs/integrations/*.md"]
+"share/hermes-agent/docs/operations" = ["docs/operations/*.md"]
+"share/hermes-agent/docs/architecture" = ["docs/architecture/*.md"]
+"share/hermes-agent/docs" = ["docs/*.md"]
+"share/hermes-agent/docs/assets" = ["docs/assets/*.png"]
+"share/hermes-agent/docs/adr" = ["docs/adr/*.md"]
+"share/hermes-agent/docs/migration" = ["docs/migration/*.md"]
+"share/hermes-agent/docs/archive" = ["docs/archive/*.md"]
+"share/hermes-agent/docs/upstream" = ["docs/upstream/*.md"]
+"share/hermes-agent/demo/payment_system/services/payment_service" = ["demo/payment_system/services/payment_service/*"]
+"share/hermes-agent/demo/payment_system/services/coupon_service" = ["demo/payment_system/services/coupon_service/*"]
+"share/hermes-agent/demo/payment_system/services/order_service" = ["demo/payment_system/services/order_service/*"]
+"share/hermes-agent/demo/payment_system/prometheus" = ["demo/payment_system/prometheus/*"]
+"share/hermes-agent/demo/payment_system/promtail" = ["demo/payment_system/promtail/*"]
+"share/hermes-agent/demo/payment_system/mysql" = ["demo/payment_system/mysql/*"]
+"share/hermes-agent/demo/payment_system/scripts" = ["demo/payment_system/scripts/*"]
+"share/hermes-agent/demo/payment_system/grafana/provisioning/datasources" = ["demo/payment_system/grafana/provisioning/datasources/*"]
+"share/hermes-agent/scripts" = ["scripts/runbook_*.py", "scripts/runbook_*.sh", "scripts/runbook_bootstrap.py", "scripts/_runbook_bootstrap.py"]
+"share/hermes-agent/tests/runbook" = ["tests/runbook/*.py"]
+"share/hermes-agent/.github/workflows" = [".github/workflows/*.yml", ".github/workflows/*.yaml"]
+
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

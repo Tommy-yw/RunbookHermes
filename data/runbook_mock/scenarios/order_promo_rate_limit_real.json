@@ -1,0 +1,7 @@
+{
+  "service": "payment-service",
+  "severity": "p2",
+  "environment": "prod",
+  "alert_name": "order_promo_rate_limit_real",
+  "summary": "payment-service receives HTTP 429 from order-service reservation path during promotion traffic rate limit bucket exhaustion"
+}

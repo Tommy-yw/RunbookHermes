@@ -58,6 +58,7 @@ class IncidentCommand:
     user_name: Optional[str] = None
     approval_id: Optional[str] = None
     decision: Optional[str] = None
+    second_confirmation: Optional[str] = None
     raw_payload_ref: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:

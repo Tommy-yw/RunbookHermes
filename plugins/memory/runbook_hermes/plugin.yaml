@@ -1,0 +1,4 @@
+name: runbook_hermes
+version: 0.2.0
+description: "Hermes official MemoryProvider bridge for RunbookHermes domain memory, routing and runbook skill publishing."
+kind: exclusive

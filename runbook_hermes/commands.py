@@ -45,5 +45,6 @@ def from_feishu_event(payload: Dict[str, Any]) -> IncidentCommand:
         user_name=event.get("user_name"),
         approval_id=event.get("approval_id"),
         decision=event.get("decision"),
+        second_confirmation=event.get("second_confirmation") or event.get("confirmation") or event.get("confirmation_token"),
         raw_payload_ref="feishu://inline",
     )

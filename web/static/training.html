@@ -1,0 +1,119 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>RunbookHermes Training / RL / AutoPipeline</title>
+  <link rel="stylesheet" href="/web/styles.css" />
+</head>
+<body>
+<script src="/web/app.js"></script>
+<script>
+shell("training", `
+  <div class="topbar hero">
+    <div>
+      <div class="hero-mini">TRAINING / RL / AUTOPIPELINE</div>
+      <h1 class="page-title">Training / RL / AutoPipeline 训练数据闭环</h1>
+      <p class="page-subtitle">把事故和 benchmark 转换成 Hermes trajectories、SFT、preference、reward 数据，并生成 PAI/DashScope dry-run handoff。</p>
+    </div>
+    <div class="toolbar"><button class="secondary" onclick="loadAll()">刷新</button></div>
+  </div>
+
+  <section class="grid-4" id="training-kpis"></section>
+
+  <section class="grid-2">
+    <div class="card">
+      <h2>本地 AutoPipeline</h2>
+      <p class="muted">默认 dry-run，只生成数据和云端 handoff 模板，不会自动提交训练任务。</p>
+      <div class="form-grid">
+        <label>min_reward</label><input id="min-reward" value="0.65" />
+        <label>max_incidents 可选</label><input id="max-incidents" placeholder="空=默认" />
+        <button class="button" onclick="runTrainingPipeline()">运行本地 AutoPipeline</button>
+        <button class="button secondary" onclick="buildDatasetOnly()">只构建 dataset</button>
+      </div>
+      <div id="training-results"></div>
+    </div>
+
+    <div class="card">
+      <h2>官方 Hermes RL handoff</h2>
+      <div id="training-official"></div>
+    </div>
+  </section>
+
+  <section class="grid-2">
+    <div class="card">
+      <div class="split"><h2>训练 runs</h2><button class="button secondary" onclick="loadTrainingRuns()">刷新 runs</button></div>
+      <div id="training-runs"></div>
+    </div>
+    <div class="card">
+      <div class="split"><h2>数据集文件</h2><button class="button secondary" onclick="loadDatasets()">刷新 datasets</button></div>
+      <div id="training-datasets"></div>
+    </div>
+  </section>
+`);
+
+async function loadAll() {
+  const tr = await api('/training/status');
+  document.getElementById('training-kpis').innerHTML = `
+    <div class="kpi"><div class="label">Status</div><div class="num">${esc(tr.status || '-')}</div></div>
+    <div class="kpi"><div class="label">Incidents</div><div class="num">${tr.stored_incidents || 0}</div></div>
+    <div class="kpi"><div class="label">Cases</div><div class="num">${tr.benchmark_cases || 0}</div></div>
+    <div class="kpi"><div class="label">min_reward</div><div class="num">${tr.min_reward || '-'}</div></div>
+  `;
+  const official = tr.official_hermes_rl || {};
+  document.getElementById('training-official').innerHTML = `
+    <p>${badge(official.batch_runner_exists ? 'batch_runner ok' : 'batch_runner missing')}</p>
+    <p>${badge(official.trajectory_compressor_exists ? 'compressor ok' : 'compressor missing')}</p>
+    <p>${badge(official.rl_cli_exists ? 'rl_cli ok' : 'rl_cli missing')}</p>
+    <p>${badge(tr.alicloud_enabled ? 'alicloud handoff on' : 'alicloud handoff off')} ${badge(tr.alicloud_execute_enabled ? 'execute on' : 'execute off')}</p>
+    <p class="muted">${esc(tr.training_dir || '')}</p>
+  `;
+  await Promise.all([loadTrainingRuns(true), loadDatasets(true)]);
+}
+
+function requestOptions() {
+  const minReward = Number(val('min-reward'));
+  const maxIncidentsRaw = val('max-incidents').trim();
+  return {
+    include_incidents: true,
+    include_benchmark_cases: true,
+    min_reward: Number.isFinite(minReward) ? minReward : 0.65,
+    max_incidents: maxIncidentsRaw ? Number(maxIncidentsRaw) : null,
+    dry_run: true,
+  };
+}
+
+async function runTrainingPipeline() {
+  const res = await api('/training/pipeline/run', {method:'POST', body: JSON.stringify(requestOptions())});
+  document.getElementById('training-results').innerHTML = `<div class="event"><b>${esc(res.run_id || '')}</b> ${badge(res.status)} ${badge(res.dry_run ? 'dry-run' : 'execute')}<div class="muted">duration=${esc(res.duration_seconds || 0)}s</div></div>` + jsonBlock(res.next_actions || []);
+  await loadAll();
+}
+
+async function buildDatasetOnly() {
+  const opts = requestOptions();
+  delete opts.dry_run;
+  const res = await api('/training/build-dataset', {method:'POST', body: JSON.stringify(opts)});
+  document.getElementById('training-results').innerHTML = jsonBlock(res);
+  await loadAll();
+}
+
+async function loadTrainingRuns(silent=false) {
+  const res = await api('/training/runs?limit=8');
+  const html = (res.runs || []).map(r => `<div class="event"><b>${esc(r.run_id)}</b> ${badge(r.status || 'run')}<div class="muted">records=${esc(r.record_count || '')} · min_reward=${esc(r.min_reward || '')}</div></div>`).join('') || '<div class="empty">暂无训练 runs</div>';
+  if (!silent || (res.runs || []).length) document.getElementById('training-runs').innerHTML = html;
+}
+
+async function loadDatasets(silent=false) {
+  const res = await api('/training/datasets?limit=20');
+  const html = (res.datasets || []).map(d => {
+    const paths = d.paths || {};
+    const displayPath = d.manifest_path || d.compressed_path || paths.compressed_jsonl || paths.trajectories_jsonl || '';
+    return `<div class="event"><b>${esc(d.run_id || d.name || 'dataset')}</b> ${badge(d.status || 'dataset')}<div class="muted">records=${esc(d.record_count || '')} · ${esc(displayPath)}</div></div>`;
+  }).join('') || '<div class="empty">暂无数据集文件</div>';
+  if (!silent || (res.datasets || []).length) document.getElementById('training-datasets').innerHTML = html;
+}
+
+function val(id) { return document.getElementById(id).value; }
+loadAll().catch(e => toast(e.message));
+</script>
+</body>
+</html>

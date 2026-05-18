@@ -87,3 +87,11 @@ __pycache__/
 .pytest_cache/
 .venv/
 venv/
+
+.artifacts/
+artifacts/
+validation-artifacts/
+runbook_validation_artifacts/
+*.egg-info/
+dist/
+build/

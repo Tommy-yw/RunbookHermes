@@ -8,6 +8,28 @@ allowed_tools:
   - incident_rca_guard
   - action_policy_guard
   - runbook_approval_decision
+  - execute_controlled_action
+  - runbook_memory_recall
+  - runbook_memory_write
+  - runbook_memory_feedback
+  - runbook_memory_status
+  - runbook_evolution_digest
+  - runbook_memory_reindex_skills
+  - runbook_skill_publish_status
+  - runbook_publish_skill
+  - runbook_memory_route
+  - runbook_rag_status
+  - runbook_rag_ingest_text
+  - runbook_rag_search
+  - runbook_rag_context
+  - runbook_multimodal_analyze
+  - runbook_topology_parse
+  - runbook_eval_benchmark
+  - runbook_training_status
+  - runbook_training_build_dataset
+  - runbook_training_compress
+  - runbook_training_export
+  - runbook_training_pipeline
 blocked_tools:
   - browser_automation
   - execute_code
@@ -20,4 +42,69 @@ risk:
     risk_level: destructive
     requires_approval: true
     checkpoint_before_execution: true
+    dry_run_default: true
+  execute_controlled_action:
+    risk_level: write_safe
+    requires_approval: true
+    checkpoint_before_execution: true
+    dry_run_default: true
+  runbook_memory_write:
+    risk_level: memory_write
+    requires_approval: false
+    checkpoint_before_execution: false
+    dry_run_default: false
+    safety_scan_required: true
+  runbook_memory_route:
+    risk_level: memory_router
+    requires_approval: false
+    checkpoint_before_execution: false
+    dry_run_default: false
+  runbook_publish_skill:
+    risk_level: skill_publish
+    requires_approval: false
+    checkpoint_before_execution: false
+    dry_run_default: false
+    safety_scan_required: true
+
+  runbook_rag_ingest_text:
+    risk_level: knowledge_write
+    requires_approval: false
+    checkpoint_before_execution: false
+    dry_run_default: false
+    safety_scan_required: true
+  runbook_multimodal_analyze:
+    risk_level: read_only
+    requires_approval: false
+    checkpoint_before_execution: false
+    dry_run_default: true
+  runbook_eval_benchmark:
+    risk_level: read_only
+    requires_approval: false
+    checkpoint_before_execution: false
+    dry_run_default: true
+  runbook_training_status:
+    risk_level: read_only
+    requires_approval: false
+    checkpoint_before_execution: false
+    dry_run_default: true
+  runbook_training_build_dataset:
+    risk_level: dataset_write
+    requires_approval: false
+    checkpoint_before_execution: false
+    dry_run_default: true
+    safety_scan_required: true
+  runbook_training_compress:
+    risk_level: dataset_write
+    requires_approval: false
+    checkpoint_before_execution: false
+    dry_run_default: true
+  runbook_training_export:
+    risk_level: external_handoff
+    requires_approval: true
+    checkpoint_before_execution: false
+    dry_run_default: true
+  runbook_training_pipeline:
+    risk_level: external_handoff
+    requires_approval: true
+    checkpoint_before_execution: false
     dry_run_default: true

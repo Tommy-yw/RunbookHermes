@@ -1,0 +1,77 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>RunbookHermes Multimodal Evidence</title>
+  <link rel="stylesheet" href="/web/styles.css" />
+</head>
+<body>
+<script src="/web/app.js"></script>
+<script>
+shell("multimodal", `
+  <div class="topbar hero">
+    <div>
+      <div class="hero-mini">MULTIMODAL EVIDENCE</div>
+      <h1 class="page-title">Multimodal evidence 多模态证据</h1>
+      <p class="page-subtitle">将 Grafana 截图、飞书告警卡片、拓扑图 OCR、日志截图文本提示转换成 incident evidence。</p>
+    </div>
+    <div class="toolbar"><button class="secondary" onclick="resetExample()">恢复示例</button></div>
+  </div>
+
+  <section class="grid-2">
+    <div class="card">
+      <h2>证据输入</h2>
+      <p class="muted">当前页面支持文本提示和 OCR/截图引用。打开 Hermes vision 后，也可以把 image_path 或 image_url 交给 vision_analyze。</p>
+      <div class="form-grid">
+        <label>Service</label><input id="mm-service" placeholder="service" value="payment-service" />
+        <label>Summary</label><input id="mm-summary" placeholder="summary" value="Grafana screenshot shows HTTP 503 spike and p95 latency" />
+        <label>visual_refs JSON</label><textarea id="mm-refs" rows="10"></textarea>
+        <button class="button" onclick="analyzeMultimodal()">分析多模态证据</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>支持的证据类型</h2>
+      <div class="timeline">
+        <div class="timeline-item"><b>grafana_screenshot</b><div class="muted">Grafana 截图或截图 OCR，提取 503/504/429、p95/p99、发布标记。</div></div>
+        <div class="timeline-item"><b>feishu_alert_card</b><div class="muted">飞书告警卡片截图或 payload，沉淀告警上下文。</div></div>
+        <div class="timeline-item"><b>topology_diagram</b><div class="muted">拓扑图或 OCR 文本，解析 service/dependency nodes 和 edges。</div></div>
+        <div class="timeline-item"><b>log_screenshot</b><div class="muted">日志截图 OCR，提取 timeout、rate limit、connection pool 等异常。</div></div>
+        <div class="timeline-item"><b>monitoring_dashboard</b><div class="muted">监控大盘 snapshot，形成补充 evidence。</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>分析结果</h2>
+    <div id="mm-results" class="empty">尚未分析。</div>
+  </section>
+`);
+
+const exampleRefs = [
+  {"kind":"grafana_screenshot","text_hint":"HTTP 503 spike, p95 latency 2s, v2.3.1 deploy marker"},
+  {"kind":"topology_diagram","text_hint":"payment-service -> coupon-service -> redis"}
+];
+
+function resetExample() {
+  document.getElementById('mm-service').value = 'payment-service';
+  document.getElementById('mm-summary').value = 'Grafana screenshot shows HTTP 503 spike and p95 latency';
+  document.getElementById('mm-refs').value = JSON.stringify(exampleRefs, null, 2);
+}
+
+async function analyzeMultimodal() {
+  let refs = [];
+  try { refs = JSON.parse(val('mm-refs') || '[]'); } catch(e) { toast('visual_refs JSON 解析失败'); return; }
+  const res = await api('/multimodal/analyze', {method:'POST', body: JSON.stringify({service: val('mm-service'), summary: val('mm-summary'), visual_refs: refs, include_dashboard_snapshot: true})});
+  document.getElementById('mm-results').innerHTML = (res.evidence || []).map(e => `<div class="event">
+    <div class="split"><b>${esc(e.source)}</b>${badge(num(e.confidence,2))}</div>
+    <div>${esc(e.summary)}</div>
+    <details><summary>details</summary>${jsonBlock(e.details || {})}</details>
+  </div>`).join('') || jsonBlock(res);
+}
+
+function val(id) { return document.getElementById(id).value; }
+resetExample();
+</script>
+</body>
+</html>

@@ -1,0 +1,155 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>RunbookHermes Memory</title>
+  <link rel="stylesheet" href="/web/styles.css" />
+</head>
+<body>
+<script src="/web/app.js"></script>
+<script>
+shell("memory", `
+  <div class="topbar hero">
+    <div>
+      <div class="hero-mini">SELF-EVOLVING MEMORY</div>
+      <h1 class="page-title">Memory控制台</h1>
+      <p class="page-subtitle">本页展示 RunbookHermes 的本地记忆层：Prompt notebooks、SQLite FTS5 历史档案、SKILL.md 技能索引、离线 HRR 语义检索、反馈信任分和可选外部记忆 Provider。</p>
+    </div>
+    <div class="toolbar">
+      <button onclick="reindexSkills()">索引 Skills</button>
+      <button class="secondary" onclick="loadAll()">刷新</button>
+    </div>
+  </div>
+
+  <section class="grid-4" id="memory-kpis"></section>
+
+  <section class="grid-2">
+    <div class="card">
+      <h2>记忆检索</h2>
+      <label>Query</label><input id="q" value="payment-service HTTP 503 connection pool" />
+      <label>Service</label><input id="svc" value="payment-service" />
+      <div class="toolbar"><button onclick="searchMemory()">搜索</button><button class="secondary" onclick="document.getElementById('q').value=''">清空</button></div>
+      <div id="search-results" class="timeline"></div>
+    </div>
+    <div class="card">
+      <h2>自我进化摘要</h2>
+      <div id="digest"></div>
+    </div>
+  </section>
+
+  <section class="grid-2">
+    <div class="card">
+      <h2>写入稳定记忆</h2>
+      <p class="muted">只写稳定事实、治理规则、团队排障习惯。原始日志、Trace、密钥和一次性噪声会被安全扫描拒绝。</p>
+      <label>Kind</label>
+      <select id="kind">
+        <option>manual_note</option>
+        <option>service_governance</option>
+        <option>service_profile</option>
+        <option>team_preference</option>
+        <option>fault_pattern</option>
+        <option>incident_summary</option>
+        <option>rag_document</option>
+        <option>visual_observation</option>
+        <option>topology_observation</option>
+      </select>
+      <label>Notebook 可选</label>
+      <select id="notebook">
+        <option value="">只写 SQLite/HRR 索引</option>
+        <option>MEMORY.md</option>
+        <option>USER.md</option>
+        <option>SERVICE_PROFILE.md</option>
+        <option>FAULT_PATTERNS.md</option>
+        <option>TEAM_RUNBOOK_HABITS.md</option>
+      </select>
+      <label>Title</label><input id="title" value="payment-service rollback habit" />
+      <label>Body</label><textarea id="body">payment-service 的生产回滚必须先确认最近一次 canary revision，并在 approval card 中注明 expected recovery metric。</textarea>
+      <label>Tags, comma separated</label><input id="tags" value="payment-service,governance,rollback" />
+      <button onclick="writeMemory()">写入记忆</button>
+      <div id="write-result"></div>
+    </div>
+    <div class="card">
+      <h2>Prompt Notebooks 快照</h2>
+      <div id="notebooks"></div>
+    </div>
+  </section>
+`);
+
+async function loadAll() {
+  const status = await api('/memory/status');
+  const digest = await api('/memory/evolution/digest?limit=6');
+  const notebooks = await api('/memory/notebooks');
+  document.getElementById('memory-kpis').innerHTML = `
+    <div class="kpi"><div class="label">Memory items</div><div class="num">${status.total_memories || 0}</div></div>
+    <div class="kpi"><div class="label">FTS5</div><div class="num">${status.fts5_enabled ? 'ON' : 'OFF'}</div></div>
+    <div class="kpi"><div class="label">HRR dim</div><div class="num">${status.hrr?.dim || '-'}</div></div>
+    <div class="kpi"><div class="label">SNR</div><div class="num">${status.hrr?.snr || '-'}</div></div>
+  `;
+  document.getElementById('digest').innerHTML = `
+    <h3>建议</h3>
+    ${(digest.suggestions || []).map(s => `<div class="timeline-item">${esc(s)}</div>`).join('') || '<div class="empty">暂无建议</div>'}
+    <h3>高频故障模式</h3>
+    ${(digest.top_fault_patterns || []).map(renderMemoryRow).join('') || '<div class="empty">暂无故障模式</div>'}
+    <h3>团队习惯</h3>
+    ${(digest.team_preferences || []).map(renderMemoryRow).join('') || '<div class="empty">暂无团队习惯</div>'}
+  `;
+  document.getElementById('notebooks').innerHTML = Object.entries(notebooks.notebooks || {}).map(([name, body]) => `
+    <details class="evidence-card"><summary><b>${esc(name)}</b></summary><pre>${esc(body)}</pre></details>
+  `).join('');
+}
+
+function renderMemoryRow(m) {
+  return `<div class="evidence-card">
+    <div class="split"><b>${esc(m.title || m.memory_id)}</b>${badge(m.kind || 'memory')}</div>
+    <p class="muted">${esc(m.service || 'global')} · trust ${num(m.trust_score, 2)} · hits ${m.hit_count || 0}</p>
+    <p>${esc(m.snippet || '')}</p>
+  </div>`;
+}
+
+async function searchMemory() {
+  const q = encodeURIComponent(document.getElementById('q').value);
+  const svc = encodeURIComponent(document.getElementById('svc').value);
+  const result = await api(`/memory/search?query=${q}&service=${svc}&limit=8`);
+  document.getElementById('search-results').innerHTML = (result.hits || []).map(h => `
+    <div class="timeline-item">
+      <div class="split"><b>${esc(h.title)}</b>${badge(h.kind)}</div>
+      <div class="muted">id=${esc(h.memory_id)} · score=${num(h.score, 3)} · trust=${num(h.trust_score, 2)} · reason=${esc(h.reason)}</div>
+      <p>${esc(h.snippet)}</p>
+      <button class="ghost" onclick="feedback('${esc(h.memory_id)}','helpful')">有帮助</button>
+      <button class="ghost" onclick="feedback('${esc(h.memory_id)}','stale')">过期</button>
+    </div>
+  `).join('') || '<div class="empty">没有检索结果</div>';
+}
+
+async function writeMemory() {
+  const tags = document.getElementById('tags').value.split(',').map(s => s.trim()).filter(Boolean);
+  const payload = {
+    kind: document.getElementById('kind').value,
+    notebook: document.getElementById('notebook').value || null,
+    title: document.getElementById('title').value,
+    body: document.getElementById('body').value,
+    service: document.getElementById('svc').value,
+    tags,
+    source: 'web'
+  };
+  const result = await api('/memory', {method: 'POST', body: JSON.stringify(payload)});
+  document.getElementById('write-result').innerHTML = jsonBlock(result);
+  await loadAll();
+}
+
+async function feedback(memoryId, label) {
+  await api(`/memory/${encodeURIComponent(memoryId)}/feedback`, {method: 'POST', body: JSON.stringify({label})});
+  toast(`feedback: ${label}`);
+  await searchMemory();
+}
+
+async function reindexSkills() {
+  const result = await api('/memory/reindex-skills', {method: 'POST'});
+  toast(`indexed ${result.indexed_count || 0} skills`);
+  await loadAll();
+}
+
+loadAll().then(searchMemory).catch(e => toast(e.message));
+</script>
+</body>
+</html>

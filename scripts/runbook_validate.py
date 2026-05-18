@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+from runbook_bootstrap import PROJECT_ROOT, bootstrap
+bootstrap()
+ROOT = PROJECT_ROOT
+
+import sys
+from pathlib import Path
+
+
 import importlib.util, json
 from pathlib import Path
 
@@ -7,7 +15,7 @@ from runbook_hermes.smoke import run_smoke
 from plugins.memory import load_memory_provider
 from plugins.context_engine import load_context_engine
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = PROJECT_ROOT
 
 class Ctx:
     def __init__(self):

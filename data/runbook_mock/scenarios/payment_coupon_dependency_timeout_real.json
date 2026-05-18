@@ -1,0 +1,7 @@
+{
+  "service": "payment-service",
+  "severity": "p2",
+  "environment": "prod",
+  "alert_name": "payment_coupon_dependency_timeout_real",
+  "summary": "payment-service HTTP 504 caused by coupon-service dependency timeout; payment itself has no direct rollback signal"
+}

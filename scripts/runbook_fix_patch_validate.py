@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+from runbook_bootstrap import PROJECT_ROOT, bootstrap
+bootstrap()
+ROOT = PROJECT_ROOT
+
+import sys
+from pathlib import Path
+
+
 import json
 import os
 import tempfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = PROJECT_ROOT
 
 
 def _read(path: str) -> str:

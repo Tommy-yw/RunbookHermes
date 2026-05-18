@@ -1,0 +1,97 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>RunbookHermes RAG 知识库</title>
+  <link rel="stylesheet" href="/web/styles.css" />
+</head>
+<body>
+<script src="/web/app.js"></script>
+<script>
+shell("rag", `
+  <div class="topbar hero">
+    <div>
+      <div class="hero-mini">CITATION RAG</div>
+      <h1 class="page-title">RAG 知识库</h1>
+      <p class="page-subtitle">导入 SRE 手册、服务排障文档和架构说明，生成带 source/chunk citation 的本地知识库。</p>
+    </div>
+    <div class="toolbar"><button class="secondary" onclick="loadAll()">刷新</button></div>
+  </div>
+
+  <section class="grid-4" id="rag-kpis"></section>
+
+  <section class="grid-2">
+    <div class="card">
+      <h2>导入 RAG 文档</h2>
+      <p class="muted">适合导入稳定文档：Runbook、SRE 手册、数据库连接池排障说明、依赖关系文档。不要导入密钥、token 或一次性噪声日志。</p>
+      <div class="form-grid">
+        <label>Title</label><input id="rag-title" placeholder="文档标题" value="payment-service DB pool runbook" />
+        <label>Service</label><input id="rag-service" placeholder="service" value="payment-service" />
+        <label>Body</label><textarea id="rag-body" rows="8">payment-service HTTP 503 发生时，先检查 database connection pool saturation、MySQL trace latency 和最近发布，再决定是否 rollback。</textarea>
+        <button class="button" onclick="ingestRag()">导入 RAG 文档</button>
+      </div>
+      <div id="rag-ingest-result"></div>
+    </div>
+
+    <div class="card">
+      <h2>检索 Citation</h2>
+      <p class="muted">搜索结果会返回 citation，便于事故处理时追溯到具体来源和 chunk。</p>
+      <div class="form-grid">
+        <label>Query</label><input id="rag-query" placeholder="搜索 query" value="connection pool rollback" />
+        <label>Service</label><input id="rag-search-service" placeholder="service" value="payment-service" />
+        <button class="button secondary" onclick="searchRag()">搜索</button>
+      </div>
+      <div id="rag-results"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="split"><h2>文档列表</h2><span id="rag-db-path" class="muted"></span></div>
+    <div id="rag-documents"></div>
+  </section>
+`);
+
+async function loadAll() {
+  const rag = await api('/rag/status');
+  const docs = await api('/rag/documents');
+  const list = docs.documents || docs.docs || [];
+  document.getElementById('rag-kpis').innerHTML = `
+    <div class="kpi"><div class="label">RAG</div><div class="num">${rag.enabled ? 'ON' : 'OFF'}</div></div>
+    <div class="kpi"><div class="label">Docs</div><div class="num">${rag.documents || list.length || 0}</div></div>
+    <div class="kpi"><div class="label">Chunks</div><div class="num">${rag.chunks || 0}</div></div>
+    <div class="kpi"><div class="label">Context limit</div><div class="num">${rag.context_limit || '-'}</div></div>
+  `;
+  document.getElementById('rag-db-path').innerHTML = esc(rag.db_path || '');
+  document.getElementById('rag-documents').innerHTML = list.length ? list.map(renderDoc).join('') : '<div class="empty">暂无文档，先导入一条 RAG 文档。</div>';
+}
+
+function renderDoc(doc) {
+  return `<div class="event">
+    <div class="split"><b>${esc(doc.title || doc.document_id || 'document')}</b>${badge(doc.service || 'global')}</div>
+    <div class="muted">${esc(doc.source || '')} · chunks=${esc(doc.chunk_count || doc.chunks || 0)}</div>
+  </div>`;
+}
+
+async function ingestRag() {
+  const res = await api('/rag/ingest-text', {method:'POST', body: JSON.stringify({title: val('rag-title'), service: val('rag-service'), body: val('rag-body'), source:'web://rag'})});
+  document.getElementById('rag-ingest-result').innerHTML = jsonBlock(res);
+  toast('RAG ingest: ' + (res.status || 'ok'));
+  await loadAll();
+}
+
+async function searchRag() {
+  const q = encodeURIComponent(val('rag-query'));
+  const service = encodeURIComponent(val('rag-search-service'));
+  const res = await api(`/rag/search?query=${q}&service=${service}&limit=8&include_text=false`);
+  document.getElementById('rag-results').innerHTML = (res.hits || []).map(h => `<div class="event">
+    <div class="split"><b>${esc(h.title || h.document_id || 'hit')}</b>${badge(h.citation || h.source || 'citation')}</div>
+    <div class="muted">score=${num(h.score, 3)} · service=${esc(h.service || 'global')}</div>
+    <div>${esc(h.snippet || h.text || '')}</div>
+  </div>`).join('') || '<div class="empty">无结果</div>';
+}
+
+function val(id) { return document.getElementById(id).value; }
+loadAll().catch(e => toast(e.message));
+</script>
+</body>
+</html>

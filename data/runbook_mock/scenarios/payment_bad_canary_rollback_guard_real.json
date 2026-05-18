@@ -1,0 +1,7 @@
+{
+  "service": "payment-service",
+  "severity": "p1",
+  "environment": "prod",
+  "alert_name": "payment_bad_canary_rollback_guard_real",
+  "summary": "payment-service HTTP 503 after v2.3.1 recent canary deploy with connection pool exhausted logs; verify rollback requires approval and checkpoint"
+}

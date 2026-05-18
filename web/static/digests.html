@@ -42,7 +42,7 @@ async function load() {
     <div class="evidence-card"><div class="split"><b>${esc(k)}</b><span class="badge">${v}</span></div></div>
   `).join("") || `<div class="empty">No fault categories yet.</div>`;
   document.getElementById("skills").innerHTML = (s.recent_skills || []).map(sk => `
-    <div class="evidence-card"><div class="split"><b>${esc(sk.title || sk.skill_id)}</b><a href="/skills/${sk.skill_id}/download">Download</a></div><p class="dim">${fmtTime(sk.created_at)}</p></div>
+    <div class="evidence-card"><div class="split"><b>${esc(sk.title || sk.skill_id)}</b><a href="#" data-skill-id="${esc(sk.skill_id)}" onclick="downloadSkill(this.dataset.skillId); return false;">Download</a></div><p class="dim">${fmtTime(sk.created_at)}</p></div>
   `).join("") || `<div class="empty">No generated skills yet.</div>`;
 }
 async function runDigest(path) {

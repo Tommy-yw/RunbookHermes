@@ -246,3 +246,8 @@ tr:hover td { background: rgba(255,255,255,.025); }
   .grid-2, .grid-3, .grid-4, .monitor-grid { grid-template-columns: 1fr; }
   .topbar { flex-direction: column; }
 }
+
+.auth-card input { margin-bottom: 8px; }
+.mini-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.mini-actions button { padding: 7px 10px; border-radius: 10px; font-size: 12px; }
+.tiny { font-size: 12px; line-height: 1.4; }

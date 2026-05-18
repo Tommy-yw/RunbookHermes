@@ -4,11 +4,11 @@ import time
 from typing import Any, Dict
 
 from .config import load_settings
-from .store import JsonStore
+from .store import Store, get_store
 
 
-def _store() -> JsonStore:
-    return JsonStore(load_settings().store_dir)
+def _store() -> Store:
+    return get_store(load_settings())
 
 
 def _event_key(service: str, incident_id: str | None = None) -> str:
@@ -61,7 +61,7 @@ def create_approval(
     return item
 
 
-def decide_approval(approval_id: str, decision: str, approver: str = "operator", comment: str = "") -> Dict[str, Any]:
+def decide_approval(approval_id: str, decision: str, approver: str = "operator", comment: str = "", second_confirmation: str = "") -> Dict[str, Any]:
     data = _store().read("approvals")
     item = data.get(approval_id)
     if not item:
@@ -70,6 +70,8 @@ def decide_approval(approval_id: str, decision: str, approver: str = "operator",
     item["status"] = "approved" if normalized in {"approved", "approve", "yes"} else "rejected"
     item["approver"] = approver
     item["comment"] = comment
+    if second_confirmation:
+        item["second_confirmation"] = second_confirmation
     item["decided_at"] = time.time()
     data[approval_id] = item
     _store().write("approvals", data)

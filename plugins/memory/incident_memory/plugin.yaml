@@ -1,4 +1,4 @@
 name: incident_memory
-version: 0.1.0
-description: "RunbookHermes local stable incident memory provider."
+version: 0.2.0
+description: "Compatibility alias for the RunbookHermes Hermes MemoryProvider bridge. Prefer memory.provider=runbook_hermes."
 kind: exclusive

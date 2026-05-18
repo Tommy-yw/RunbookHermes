@@ -1,19 +1,46 @@
-# Git
+# Git history is not needed in Docker build context
 .git
-.gitignore
 .gitmodules
 
-# Dependencies
-node_modules
-.venv
-
-# CI/CD
-.github
-
-# Environment files
+# Dependencies / local environments
+node_modules/
+.venv/
+venv/
 .env
+.env.*
+!.env.example
+!.env.runbook.example
 
-*.md
+# Python/runtime caches
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# Runtime data (bind-mounted at /opt/data; must not leak into build context)
-data/
+# RunbookHermes runtime stores and validation artifacts
+.runbook_hermes_store/
+.artifacts/
+artifacts/
+validation-artifacts/
+runbook_validation_artifacts/
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+*.log
+
+# Build outputs at repository root. Keep plugin dashboard dist/ assets.
+/build/
+/dist/
+/hermes_agent.egg-info/
+*.egg-info/
+hermes_cli/web_dist/
+
+# Large/local development outputs
+wandb/
+logs/
+testlogs/
+node_modules/

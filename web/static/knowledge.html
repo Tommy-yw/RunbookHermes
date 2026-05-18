@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="refresh" content="0; url=/web/rag.html" />
+  <title>RunbookHermes RAG</title>
+  <link rel="stylesheet" href="/web/styles.css" />
+</head>
+<body>
+<script src="/web/app.js"></script>
+<script>
+shell("rag", `
+  <div class="topbar hero">
+    <div>
+      <div class="hero-mini">PAGE SPLIT</div>
+      <h1 class="page-title">RAG / Eval / Training / Multimodal 已拆分</h1>
+      <p class="page-subtitle">旧的组合页面已拆成四个独立页面。正在跳转到 RAG 知识库。</p>
+    </div>
+    <div class="toolbar">
+      <a class="button" href="/web/rag.html">RAG 知识库</a>
+      <a class="button secondary" href="/web/eval.html">Benchmark/Eval</a>
+      <a class="button secondary" href="/web/training.html">Training/RL</a>
+      <a class="button secondary" href="/web/multimodal.html">Multimodal</a>
+    </div>
+  </div>
+`);
+setTimeout(() => { window.location.href = '/web/rag.html'; }, 200);
+</script>
+</body>
+</html>

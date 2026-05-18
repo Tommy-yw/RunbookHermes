@@ -9,7 +9,67 @@ plugins:
     - runbook-hermes
 
 memory:
-  provider: incident_memory
+  provider: runbook_hermes
+  bridge_provider: runbook_hermes
+  runbook_memory_enabled: true
+  bridge_enabled: true
+  router_enabled: true
+  feishu_router_enabled: true
+  skill_publish_enabled: true
+  skill_publish_category: runbooks/runbookhermes
+  layers:
+    - prompt_notebooks
+    - sqlite_fts5_archive
+    - skill_index
+    - local_hrr_vectors
+    - external_provider_optional
+    - feedback_trust_evolution
+  context_fencing: true
+  hrr_dim: ${RUNBOOK_MEMORY_HRR_DIM:-1024}
+  context_limit: ${RUNBOOK_MEMORY_CONTEXT_LIMIT:-6}
+  external_provider: ${RUNBOOK_MEMORY_EXTERNAL_PROVIDER:-none}
+  external_mode: ${RUNBOOK_MEMORY_EXTERNAL_MODE:-tools}
+
+
+rag:
+  enabled: true
+  dir: ${RUNBOOK_RAG_DIR:-.runbook_hermes_store/rag}
+  chunk_chars: ${RUNBOOK_RAG_CHUNK_CHARS:-1200}
+  chunk_overlap: ${RUNBOOK_RAG_CHUNK_OVERLAP:-160}
+  context_limit: ${RUNBOOK_RAG_CONTEXT_LIMIT:-5}
+  citation_fencing: true
+
+multimodal:
+  enabled: true
+  collect_dashboards: true
+  use_hermes_vision: ${RUNBOOK_MULTIMODAL_USE_HERMES_VISION:-false}
+  evidence_types:
+    - grafana_screenshot
+    - feishu_alert_card
+    - topology_diagram
+    - log_screenshot
+    - monitoring_dashboard
+
+eval:
+  persist_default: false
+  benchmark_file: data/runbook_benchmark/eval_cases.json
+
+training:
+  enabled: true
+  dir: ${RUNBOOK_TRAINING_DIR:-.runbook_hermes_store/training}
+  max_incidents: ${RUNBOOK_TRAINING_MAX_INCIDENTS:-100}
+  min_reward: ${RUNBOOK_TRAINING_MIN_REWARD:-0.65}
+  base_model: ${RUNBOOK_TRAINING_BASE_MODEL:-Qwen/Qwen3-8B}
+  formats:
+    - hermes_trajectories
+    - sft_messages
+    - preference_pairs
+    - reward_jsonl
+  alicloud_autopipeline_enabled: ${RUNBOOK_ALICLOUD_AUTOPIPELINE_ENABLED:-false}
+
+api_auth:
+  enabled: ${RUNBOOK_API_AUTH_ENABLED:-false}
+  header: ${RUNBOOK_API_AUTH_HEADER:-x-runbook-token}
 
 context:
   engine: evidence_stack

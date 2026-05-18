@@ -1,0 +1,7 @@
+{
+  "service": "payment-service",
+  "severity": "p1",
+  "environment": "prod",
+  "alert_name": "payment_db_pool_saturation_real",
+  "summary": "payment-service HTTP 503 spike after recent canary deploy; mysql-payment connection pool saturation and p95 latency regression observed"
+}

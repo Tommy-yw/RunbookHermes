@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Sequence
 
 from integrations.observability.deploy_backend import DemoDeployBackend
 from integrations.observability.loki_backend import LokiBackend
@@ -10,9 +12,10 @@ from integrations.observability.prometheus_backend import PrometheusBackend
 from integrations.observability.trace_backend import JaegerTraceBackend, TempoTraceBackend
 
 from .config import Settings, load_settings
+from .resources import resource_path
+from .service_profiles import first_present, load_service_profile
 
-ROOT = Path(__file__).resolve().parent.parent
-MOCK_ROOT = ROOT / "data" / "runbook_mock"
+MOCK_ROOT = resource_path("data", "runbook_mock")
 
 
 class BackendNotConfigured(RuntimeError):
@@ -33,7 +36,7 @@ class MockObservabilityBackend:
         return data
 
     def prom_query(self, service: str, query: str = "", window: str = "15m") -> Dict[str, Any]:
-        return {"status": "success", "service": service, "query": query, "window": window, "data": self._read("mock_metrics", service)}
+        return {"status": "success", "service": service, "query": query, "window": window, "data": self._read("mock_metrics", service), "adapter": "mock"}
 
     def prom_top_anomalies(self, service: str, window: str = "15m") -> List[Dict[str, Any]]:
         return self._read("mock_metrics", service)
@@ -77,20 +80,114 @@ class RealObservabilityBackend:
     def recent_deploys(self, service: str, since: str = "2h") -> List[Dict[str, Any]]:
         if self.settings.deploy_backend in {"demo_file", "payment_demo"}:
             return self.demo_deploy.recent_deploys(service, since=since)
-        return [{
-            "evidence_id": "ev_deploy_not_configured",
-            "source": "deploy",
-            "service": service,
-            "summary": "Set DEPLOY_BACKEND=demo_file, argocd or custom to enable deploy history.",
-            "raw_ref": "deploy://not-configured",
-            "confidence": 0.3,
-        }]
+        return [
+            {
+                "evidence_id": "ev_deploy_not_configured",
+                "source": "deploy",
+                "service": service,
+                "summary": "Set DEPLOY_BACKEND=demo_file, argocd or kubernetes to enable deploy history.",
+                "raw_ref": "deploy://not-configured",
+                "confidence": 0.3,
+            }
+        ]
+
+
+def _command_result(command: Sequence[str], timeout: int, env: Dict[str, str] | None = None) -> Dict[str, Any]:
+    try:
+        completed = subprocess.run(list(command), capture_output=True, text=True, timeout=timeout, check=False, env=env)
+        return {
+            "returncode": completed.returncode,
+            "stdout": completed.stdout[-4000:],
+            "stderr": completed.stderr[-4000:],
+            "ok": completed.returncode == 0,
+        }
+    except FileNotFoundError:
+        return {"ok": False, "returncode": 127, "stderr": f"command not found: {command[0] if command else ''}", "stdout": ""}
+    except subprocess.TimeoutExpired as exc:
+        return {"ok": False, "returncode": 124, "stderr": f"timeout after {timeout}s: {exc}", "stdout": exc.stdout or ""}
 
 
 class DeployBackend:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.demo = DemoDeployBackend(settings.demo_deploy_state_file, settings.demo_version_file)
+
+    def _profile(self, service: str) -> Dict[str, Any]:
+        return load_service_profile(service)
+
+    def _kube_base(self) -> List[str]:
+        cmd = [self.settings.kubectl_binary]
+        if self.settings.kubernetes_kubeconfig:
+            cmd.extend(["--kubeconfig", self.settings.kubernetes_kubeconfig])
+        if self.settings.kubernetes_context:
+            cmd.extend(["--context", self.settings.kubernetes_context])
+        return cmd
+
+    def _kubernetes_command(self, service: str, target_revision: str, profile: Dict[str, Any]) -> List[str]:
+        rollback = profile.get("rollback") or {}
+        namespace = first_present(rollback.get("kubernetes_namespace"), self.settings.kubernetes_namespace, self.settings.rollout_app_namespace, "default")
+        workload_kind = first_present(rollback.get("kubernetes_workload_kind"), self.settings.kubernetes_workload_kind, "deployment").lower()
+        workload_name = first_present(self.settings.kubernetes_rollout_name, rollback.get("kubernetes_workload_name"), service)
+        mode = first_present(self.settings.kubernetes_rollback_mode, "deployment_image").lower()
+        cmd = self._kube_base() + ["-n", namespace]
+        if mode == "rollout_undo":
+            cmd.extend(["argo", "rollouts", "undo", f"rollout/{workload_name}"])
+            if target_revision.isdigit():
+                cmd.extend(["--to-revision", target_revision])
+            return cmd
+        if mode == "deployment_undo":
+            cmd.extend(["rollout", "undo", f"{workload_kind}/{workload_name}"])
+            if target_revision.isdigit():
+                cmd.extend(["--to-revision", target_revision])
+            return cmd
+        container = first_present(self.settings.kubernetes_container, rollback.get("kubernetes_container"), service)
+        image_repo = first_present(self.settings.kubernetes_image_repository, rollback.get("image_repository"))
+        if not image_repo:
+            # Fall back to a Kubernetes-native undo when an immutable image repo is
+            # not configured. Operators can set RUNBOOK_K8S_ROLLBACK_MODE for a
+            # stricter strategy.
+            return self._kube_base() + ["-n", namespace, "rollout", "undo", f"{workload_kind}/{workload_name}"]
+        image = f"{image_repo}:{target_revision}"
+        return cmd + ["set", "image", f"{workload_kind}/{workload_name}", f"{container}={image}"]
+
+    def _argocd_command(self, service: str, target_revision: str, profile: Dict[str, Any]) -> List[str]:
+        rollback = profile.get("rollback") or {}
+        app = first_present(self.settings.argocd_app, rollback.get("argocd_app"), service)
+        cmd = [self.settings.argocd_binary]
+        if self.settings.argocd_server:
+            cmd.extend(["--server", self.settings.argocd_server])
+        if self.settings.argocd_auth_token:
+            cmd.extend(["--auth-token", self.settings.argocd_auth_token])
+        cmd.extend(["app", "rollback", app, target_revision])
+        return cmd
+
+    def _execute_adapter_command(self, backend: str, command: List[str], dry_run: bool, service: str, target_revision: str, checkpoint_id: str) -> Dict[str, Any]:
+        payload = {
+            "status": "dry_run_succeeded" if dry_run else "controlled_execution_succeeded",
+            "service": service,
+            "target_revision": target_revision,
+            "dry_run": dry_run,
+            "checkpoint_id": checkpoint_id,
+            "backend": backend,
+            "command": command,
+            "raw_ref": f"rollback://{backend}/{service}/{target_revision}",
+        }
+        if dry_run:
+            payload["message"] = f"{backend} rollback command constructed but not executed."
+            return payload
+        if not self.settings.controlled_execution_enabled:
+            payload["status"] = "controlled_execution_disabled"
+            payload["message"] = "Set RUNBOOK_CONTROLLED_EXECUTION_ENABLED=true after approval/checkpoint validation to execute real rollback adapters."
+            return payload
+        env = os.environ.copy()
+        result = _command_result(command, timeout=self.settings.deploy_timeout_seconds, env=env)
+        payload["execution_result"] = result
+        if not result.get("ok"):
+            payload["status"] = "execution_failed"
+            payload["message"] = f"{backend} rollback command failed."
+        else:
+            payload["message"] = f"{backend} rollback command executed successfully."
+        return payload
 
     def rollback_canary(self, service: str, target_revision: str, dry_run: bool = True, checkpoint_id: str = "") -> Dict[str, Any]:
         if self.settings.rollback_backend_kind in {"demo_file", "payment_demo"}:
@@ -105,7 +202,15 @@ class DeployBackend:
                     "message": "Set RUNBOOK_CONTROLLED_EXECUTION_ENABLED=true to allow demo-system rollback execution.",
                 }
             return self.demo.rollback_canary(service, target_revision, dry_run=dry_run, checkpoint_id=checkpoint_id)
-        if self.settings.rollback_backend_kind != "mock":
+        profile = self._profile(service)
+        backend = self.settings.rollback_backend_kind.lower().strip()
+        if backend in {"kubernetes", "k8s"}:
+            command = self._kubernetes_command(service, target_revision, profile)
+            return self._execute_adapter_command("kubernetes", command, dry_run, service, target_revision, checkpoint_id)
+        if backend in {"argocd", "argo_cd", "argo-cd"}:
+            command = self._argocd_command(service, target_revision, profile)
+            return self._execute_adapter_command("argocd", command, dry_run, service, target_revision, checkpoint_id)
+        if backend != "mock":
             return {
                 "status": "not_configured",
                 "service": service,
@@ -113,7 +218,7 @@ class DeployBackend:
                 "dry_run": dry_run,
                 "checkpoint_id": checkpoint_id,
                 "raw_ref": f"rollback://{service}/{target_revision}",
-                "message": "Real rollback adapter shell is present. Implement Argo CD, Argo Rollouts or custom backend here.",
+                "message": "Set ROLLBACK_BACKEND_KIND=mock,demo_file,kubernetes or argocd.",
             }
         return {
             "status": "dry_run_succeeded" if dry_run else "mock_execution_succeeded",
@@ -122,6 +227,7 @@ class DeployBackend:
             "dry_run": dry_run,
             "checkpoint_id": checkpoint_id,
             "raw_ref": f"rollback://mock/{service}/{target_revision}",
+            "backend": "mock",
         }
 
     def verify_recovery(self, service: str, window: str = "2m") -> Dict[str, Any]:

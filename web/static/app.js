@@ -1,9 +1,93 @@
+const RUNBOOK_TOKEN_KEY = "runbookHermesApiToken";
+const RUNBOOK_TOKEN_HEADER = "x-runbook-token";
+
+function tokenFromUrl() {
+  const params = new URLSearchParams(window.location.search || "");
+  const token = params.get("runbook_token") || params.get("token") || "";
+  if (token) {
+    localStorage.setItem(RUNBOOK_TOKEN_KEY, token);
+    params.delete("runbook_token");
+    params.delete("token");
+    const qs = params.toString();
+    history.replaceState({}, document.title, window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash);
+  }
+  return token;
+}
+
+tokenFromUrl();
+
+function getRunbookToken() {
+  return localStorage.getItem(RUNBOOK_TOKEN_KEY) || sessionStorage.getItem(RUNBOOK_TOKEN_KEY) || "";
+}
+
+function setRunbookToken(token) {
+  const value = String(token || "").trim();
+  if (value) localStorage.setItem(RUNBOOK_TOKEN_KEY, value);
+  else localStorage.removeItem(RUNBOOK_TOKEN_KEY);
+}
+
+function clearRunbookToken() {
+  localStorage.removeItem(RUNBOOK_TOKEN_KEY);
+  sessionStorage.removeItem(RUNBOOK_TOKEN_KEY);
+}
+
+function saveTokenFromNav() {
+  const input = document.getElementById("runbook-token-input");
+  setRunbookToken(input ? input.value : "");
+  toast("API token saved locally in this browser");
+  loadRuntimeChip().catch(() => {});
+}
+
+function clearTokenFromNav() {
+  clearRunbookToken();
+  const input = document.getElementById("runbook-token-input");
+  if (input) input.value = "";
+  toast("API token cleared");
+  loadRuntimeChip().catch(() => {});
+}
+
+
+async function downloadTextWithToken(path, filename = "runbook.md") {
+  const token = getRunbookToken();
+  const headers = {};
+  if (token) {
+    headers[RUNBOOK_TOKEN_HEADER] = token;
+    headers.Authorization = `Bearer ${token}`;
+  }
+  const res = await fetch(path, { headers });
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`Download failed (${res.status}). Add a RunbookHermes token in Settings or the sidebar. ${detail}`);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function downloadSkill(skillId) {
+  const safe = String(skillId || "runbook-skill").replace(/[^a-zA-Z0-9_.-]+/g, "_");
+  await downloadTextWithToken(`/skills/${encodeURIComponent(skillId)}/download`, `${safe}.md`);
+}
+
 async function api(path, options = {}) {
-  const res = await fetch(path, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-    ...options,
-  });
-  if (!res.ok) throw new Error(await res.text());
+  const token = getRunbookToken();
+  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  if (token && !headers[RUNBOOK_TOKEN_HEADER]) headers[RUNBOOK_TOKEN_HEADER] = token;
+  if (token && !headers.Authorization) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(path, { ...options, headers });
+  if (!res.ok) {
+    const detail = await res.text();
+    if ([401, 403, 503].includes(res.status)) {
+      throw new Error(`API authentication failed (${res.status}). Add a RunbookHermes token in Settings or the sidebar. ${detail}`);
+    }
+    throw new Error(detail);
+  }
   const text = await res.text();
   return text ? JSON.parse(text) : {};
 }
@@ -52,6 +136,11 @@ function nav(active) {
     ["incidents", "/web/incidents.html", "Incidents"],
     ["approvals", "/web/approvals.html", "Approvals"],
     ["digests", "/web/digests.html", "Digests"],
+    ["memory", "/web/memory.html", "Memory"],
+    ["rag", "/web/rag.html", "RAG 知识库"],
+    ["eval", "/web/eval.html", "Benchmark/Eval"],
+    ["training", "/web/training.html", "Training/RL"],
+    ["multimodal", "/web/multimodal.html", "Multimodal"],
     ["settings", "/web/settings.html", "Settings"],
   ];
   return `<aside class="sidebar">
@@ -63,12 +152,24 @@ function nav(active) {
       <div class="muted">Safety rule</div>
       <b>Destructive action = approval + checkpoint + dry-run first.</b>
     </div>
+    <div class="side-card auth-card">
+      <div class="muted">API token</div>
+      <input id="runbook-token-input" type="password" placeholder="x-runbook-token" value="${esc(getRunbookToken())}" autocomplete="off" />
+      <div class="mini-actions"><button class="secondary" onclick="saveTokenFromNav()">Save</button><button class="ghost" onclick="clearTokenFromNav()">Clear</button></div>
+      <p class="muted tiny">Stored only in this browser. Also supports ?runbook_token=...</p>
+    </div>
     <div class="side-card" id="runtime-chip"><span class="muted">Loading runtime status...</span></div>
   </aside>`;
 }
 
 function shell(active, body) {
   document.body.innerHTML = `<div class="shell">${nav(active)}<main class="content">${body}</main></div><div id="toast-root"></div>`;
+  if (active === "memory") {
+    const title = document.querySelector(".page-title");
+    if (title && /越用越懂系统的 RunbookHermes|Memory控制台/.test(title.textContent || "")) {
+      title.textContent = "Memory控制台";
+    }
+  }
   loadRuntimeChip().catch(() => {});
 }
 
@@ -90,6 +191,7 @@ async function loadRuntimeChip() {
     <div>${badge(s.observability?.obs_backend || "mock")} ${badge(s.observability?.trace_provider_kind || "trace")}</div>
     <div style="margin-top:8px">${s.model?.enabled ? badge("model on","done") : badge("model off","pending")}</div>
     <div style="margin-top:8px">${s.execution?.controlled_execution_enabled ? badge("controlled exec on","done") : badge("controlled exec off","pending")}</div>
+    <div style="margin-top:8px">${s.memory?.enabled ? badge("memory on","done") : badge("memory off","pending")}</div>
   `;
 }
 

@@ -45,7 +45,9 @@ FEISHU_BOT_SECRET=</pre><p class="muted">Routes: /gateway/feishu/events and /gat
     <div class="card"><h2>Production execution shell</h2><pre>ACTION_EXECUTION_BACKEND=custom_http|kubernetes|argocd
 ACTION_EXECUTION_API_BASE_URL=
 ACTION_EXECUTION_API_TOKEN=
-ACTION_EXECUTION_TIMEOUT_SECONDS=5</pre><p class="muted">Non-rollback write actions stay blocked until an executor backend is explicitly configured.</p></div>
+ACTION_EXECUTION_TIMEOUT_SECONDS=5
+ACTION_EXECUTION_ALLOWED_OPERATIONS=scale_or_disable_coupon_path,adjust_rate_limit
+ACTION_EXECUTION_CONFIRMATION_TOKEN=CONFIRM_EXECUTE</pre><p class="muted">Non-rollback write actions stay blocked until backend, allowlist, approval_id and second confirmation all pass.</p></div>
   </section>
   <section class="card"><h2>Raw Runtime Status</h2><pre id="raw"></pre></section>
 `);
@@ -54,7 +56,7 @@ async function load() {
   document.getElementById("status-cards").innerHTML = `
     <div class="kpi"><div class="label">Model</div><div class="num">${s.model.enabled ? "ON" : "OFF"}</div><div>${badge(s.model.api_key_configured ? "key configured" : "key missing")}</div></div>
     <div class="kpi"><div class="label">Observability</div><div class="num">${esc(s.observability.obs_backend)}</div><div>${badge(s.observability.prometheus_configured ? "prometheus on" : "prometheus missing")}</div></div>
-    <div class="kpi"><div class="label">Execution</div><div class="num">${s.execution.controlled_execution_enabled ? "ON" : "OFF"}</div><div>${badge(s.execution.action_execution_backend)}</div></div>
+    <div class="kpi"><div class="label">Execution</div><div class="num">${s.execution.controlled_execution_enabled ? "ON" : "OFF"}</div><div>${badge(s.execution.action_execution_backend)} ${badge(s.execution.action_execution_require_second_confirmation ? "confirm on" : "confirm off")}</div></div>
   `;
   document.getElementById("raw").textContent = JSON.stringify(s, null, 2);
 }

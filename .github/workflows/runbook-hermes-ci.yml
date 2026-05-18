@@ -1,0 +1,44 @@
+name: RunbookHermes CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      docker_build_smoke:
+        description: "Run real Docker build smoke test"
+        required: false
+        default: "false"
+
+jobs:
+  runbook-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RUNBOOK_API_AUTH_ENABLED: "false"
+      RUNBOOK_MODEL_ENABLED: "false"
+      RUNBOOK_CONTROLLED_EXECUTION_ENABLED: "false"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[web,dev]'
+      - name: Compile RunbookHermes modules
+        run: python -m compileall -q runbook_hermes integrations/observability apps/runbook_api scripts tests/runbook
+      - name: Pytest RunbookHermes fast suite
+        run: pytest -vv -s -o addopts='' tests/runbook -m "not integration"
+      - name: Pytest migrated validation scripts
+        run: pytest -vv -s -o addopts='' tests/runbook/test_validation_scripts.py
+      - name: Eval benchmark regression gate
+        run: python scripts/runbook_eval_regression_gate.py --min-pass-rate 0.85 --min-score 0.85 --min-rag-citation 0.75
+      - name: Docker static smoke
+        run: RUNBOOK_DOCKER_SMOKE_MODE=static scripts/runbook_docker_smoke.sh
+      - name: Docker build smoke
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.docker_build_smoke == 'true' }}
+        run: RUNBOOK_DOCKER_SMOKE_MODE=build scripts/runbook_docker_smoke.sh

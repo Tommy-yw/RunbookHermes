@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+from runbook_bootstrap import PROJECT_ROOT, bootstrap
+bootstrap()
+ROOT = PROJECT_ROOT
+
+import sys
+from pathlib import Path
+
+
 import json
 import os
 from pathlib import Path
 
 from runbook_hermes.tools import rollback_canary, runbook_approval_decision, verify_recovery
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = PROJECT_ROOT
 
 
 def exists(path: str) -> bool:

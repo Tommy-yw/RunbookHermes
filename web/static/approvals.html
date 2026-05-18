@@ -55,7 +55,17 @@ function render() {
   `).join("") : `<div class="empty">No approvals in this filter.</div>`;
 }
 async function decide(id, decision) {
-  await api(`/approvals/${id}/decision`, {method:"POST", body: JSON.stringify({decision, approver:"web-console", comment:"decision from approval center"})});
+  const payload = {decision, approver:"web-console", comment:"decision from approval center"};
+  if (decision === "approved") {
+    const confirmed = window.confirm("Second confirmation: approve and hand off this action to the configured executor? Non-rollback production mutations also require allowlist gates.");
+    if (!confirmed) return;
+    const token = window.prompt("Type CONFIRM_EXECUTE, or your configured ACTION_EXECUTION_CONFIRMATION_TOKEN:", "CONFIRM_EXECUTE");
+    if (token === null || !token.trim()) return;
+    payload.confirm_execution = true;
+    payload.confirmation_token = token.trim();
+    payload.comment = "second confirmation supplied from approval center";
+  }
+  await api(`/approvals/${id}/decision`, {method:"POST", body: JSON.stringify(payload)});
   toast(`Approval ${decision}`);
   await loadApprovals();
 }

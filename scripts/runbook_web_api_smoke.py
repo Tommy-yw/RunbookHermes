@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+from runbook_bootstrap import PROJECT_ROOT, bootstrap
+bootstrap()
+ROOT = PROJECT_ROOT
+
+import sys
+from pathlib import Path
+
+
 import json
 
 from runbook_hermes import incident_service as svc

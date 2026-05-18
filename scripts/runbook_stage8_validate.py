@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+from runbook_bootstrap import PROJECT_ROOT, bootstrap
+bootstrap()
+ROOT = PROJECT_ROOT
+
+import sys
+from pathlib import Path
+
+
 import json
 import os
 import tempfile
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = PROJECT_ROOT
 
 
 def _exists(path: str) -> bool:
@@ -39,6 +47,9 @@ def main() -> None:
     with tempfile.TemporaryDirectory() as td:
         os.environ["RUNBOOK_STORE_DIR"] = td
         os.environ.setdefault("RUNBOOK_MODEL_ENABLED", "false")
+        os.environ["RUNBOOK_API_AUTH_ENABLED"] = "true"
+        os.environ["RUNBOOK_API_TOKEN"] = "validate-write-token"
+        os.environ["RUNBOOK_API_READ_ONLY_TOKEN"] = "validate-read-token"
         from runbook_hermes import incident_service as svc
 
         inc = svc.create_incident_from_scenario("payment_503_spike", source="stage8-validate")
@@ -52,14 +63,16 @@ def main() -> None:
             from apps.runbook_api.app.main import app
 
             client = TestClient(app)
+            read_headers = {"x-runbook-token": "validate-read-token"}
+            write_headers = {"x-runbook-token": "validate-write-token"}
             checks["api_health"] = client.get("/health").status_code == 200
-            checks["api_dashboard"] = client.get("/dashboard/summary").status_code == 200
-            checks["api_runtime"] = client.get("/runtime/status").status_code == 200
-            checks["api_scenarios"] = client.get("/demo/scenarios").status_code == 200
-            checks["api_monitoring_live"] = client.get("/monitoring/live").status_code == 200
+            checks["api_dashboard"] = client.get("/dashboard/summary", headers=read_headers).status_code == 200
+            checks["api_runtime"] = client.get("/runtime/status", headers=read_headers).status_code == 200
+            checks["api_scenarios"] = client.get("/demo/scenarios", headers=read_headers).status_code == 200
+            checks["api_monitoring_live"] = client.get("/monitoring/live", headers=read_headers).status_code == 200
             checks["api_monitoring_page"] = client.get("/web/monitoring.html").status_code == 200
             checks["api_web_static"] = client.get("/web/incidents.html").status_code == 200
-            created = client.post("/demo/scenarios/coupon_504_timeout/incident").json()
+            created = client.post("/demo/scenarios/coupon_504_timeout/incident", headers=write_headers).json()
             checks["api_create_scenario"] = bool(created.get("incident_id"))
         except ModuleNotFoundError as exc:  # pragma: no cover - optional dependency
             if exc.name == "fastapi":

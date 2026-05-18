@@ -1,0 +1,136 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>RunbookHermes Benchmark / Eval</title>
+  <link rel="stylesheet" href="/web/styles.css" />
+</head>
+<body>
+<script src="/web/app.js"></script>
+<script>
+shell("eval", `
+  <div class="topbar hero">
+    <div>
+      <div class="hero-mini">BENCHMARK / EVAL</div>
+      <h1 class="page-title">Benchmark / Eval 评测</h1>
+      <p class="page-subtitle">用真实事故样例评测 RCA、动作建议、证据召回、RAG 引用、安全门、误回滚率和 MTTR 估计。</p>
+    </div>
+    <div class="toolbar"><button class="secondary" onclick="loadAll()">刷新</button></div>
+  </div>
+
+  <section class="grid-2">
+    <div class="card">
+      <div class="split"><h2>Benchmark cases</h2><span id="case-count"></span></div>
+      <div id="eval-cases" class="timeline"></div>
+      <label class="muted"><input id="model-assist" type="checkbox" /> 使用当前 Runbook 模型辅助评分（未配置模型时只显示 disabled，不会调用其他模型）</label>
+      <div class="toolbar">
+        <button class="button" onclick="runEval()">运行 benchmark</button>
+        <button class="button secondary" onclick="loadEvalRuns()">查看历史 runs</button>
+        <button class="button secondary" onclick="loadPostmortems()">查看人工复盘</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>最近结果</h2>
+      <div id="eval-summary" class="empty">尚未运行。</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>明细</h2>
+    <div id="eval-results"></div>
+  </section>
+
+  <section class="card">
+    <h2>人工复盘 final score</h2>
+    <p class="muted">新事故复盘后，可以把人工最终评分写入这里。后续 benchmark 会优先采用人工复盘分。</p>
+    <div class="grid-2">
+      <input id="pm-case" placeholder="case_id，例如 payment_503_spike" />
+      <input id="pm-incident" placeholder="incident_id，可选" />
+    </div>
+    <div class="grid-2">
+      <input id="pm-score" placeholder="final_score 0-1，例如 0.92" />
+      <input id="pm-reviewer" placeholder="reviewer，例如 sre-lead" value="operator" />
+    </div>
+    <textarea id="pm-notes" placeholder="复盘备注：真正根因、有效动作、误判点、关键证据"></textarea>
+    <div class="toolbar"><button class="button" onclick="savePostmortem()">保存人工复盘评分</button></div>
+    <div id="pm-result"></div>
+  </section>
+`);
+
+async function loadAll() {
+  const cases = await api('/eval/benchmarks');
+  document.getElementById('case-count').innerHTML = badge('cases ' + (cases.case_count || 0));
+  document.getElementById('eval-cases').innerHTML = (cases.cases || []).map(c => `<div class="timeline-item">
+    <div class="split"><b>${esc(c.case_id)}</b>${badge(c.service || 'service')}</div>
+    <div class="muted">scenario=${esc(c.scenario_id)} · expect ${esc(c.expected_category)} / ${esc(c.expected_action_type)} · min evidence ${esc(c.min_evidence)}</div>
+    <div class="muted">evidence refs=${esc((c.expected_evidence_refs || []).length)} · RAG citations=${esc((c.expected_rag_citations || []).length)} · MTTR target=${esc(c.expected_mttr_minutes || '-')}m · aliases rca/action=${esc(c.rca_alias_count || 0)}/${esc(c.action_alias_count || 0)}</div>
+  </div>`).join('') || '<div class="empty">暂无 benchmark cases</div>';
+  await loadEvalRuns(true);
+}
+
+async function runEval() {
+  const modelAssist = !!document.getElementById('model-assist').checked;
+  const res = await api('/eval/run', {method:'POST', body: JSON.stringify({persist:false, model_assist:modelAssist})});
+  renderEvalRun(res);
+}
+
+function metricCard(label, value, suffix='%') {
+  const shown = value === null || value === undefined ? '-' : (suffix === '%' ? num(value*100,0) + '%' : esc(value));
+  return `<div class="kpi"><div class="label">${esc(label)}</div><div class="num">${shown}</div></div>`;
+}
+
+function renderEvalRun(res) {
+  const m = res.metrics || {};
+  document.getElementById('eval-summary').innerHTML = `<div class="grid-4">
+    ${metricCard('Pass', m.pass_rate)}
+    ${metricCard('RCA', m.rca_accuracy)}
+    ${metricCard('Action', m.action_accuracy)}
+    ${metricCard('Evidence Recall', m.evidence_recall_accuracy)}
+    ${metricCard('RAG Citation', m.rag_citation_accuracy)}
+    ${metricCard('False Rollback', m.false_rollback_rate)}
+    ${metricCard('MTTR Target', m.mttr_target_rate)}
+    ${metricCard('Score', m.score)}
+  </div>
+  <p class="muted">run_id=${esc(res.run_id || '-')} · duration=${esc(res.duration_seconds || 0)}s · model_assist=${esc(res.model_assist_requested)} · avg MTTR=${esc(m.estimated_mttr_minutes_avg || '-')}m · human final=${esc(m.human_final_score ?? '-')}</p>`;
+  document.getElementById('eval-results').innerHTML = (res.results || []).map(r => {
+    const a = r.actual || {}; const s = r.scores || {}; const mttr = r.mttr || {}; const mj = r.model_judge || {}; const pm = r.postmortem || {};
+    return `<div class="event">
+      <div class="split"><b>${esc(r.case_id)}</b>${badge(r.passed ? 'passed' : 'failed')} ${badge('score ' + num(r.score || 0,2))}</div>
+      <div class="muted">actual ${esc(a.category)} / ${esc(a.action_type)} · evidence=${esc(a.evidence_count || 0)} · MTTR=${esc(mttr.estimated_minutes || '-')}m / target ${esc(mttr.expected_minutes || '-')}m</div>
+      <div class="muted">scores: RCA ${num(s.rca || 0,2)} · Action ${num(s.action || 0,2)} · Evidence ${num(s.evidence_min || 0,2)} · Recall ${num(s.evidence_recall || 0,2)} · RAG ${num(s.rag_citation || 0,2)} · Safety ${num(s.safety || 0,2)}</div>
+      <div class="muted">model judge=${esc(mj.status || 'n/a')} · provider=${esc(mj.provider || '-')} · model=${esc(mj.model || '-')} · human final=${esc(pm.final_score ?? '-')}</div>
+      ${(r.failure_reasons || []).length ? `<div>${(r.failure_reasons || []).map(x => badge(x)).join(' ')}</div>` : ''}
+      <details><summary>JSON</summary>${jsonBlock(r)}</details>
+    </div>`;
+  }).join('') || jsonBlock(res);
+}
+
+async function loadEvalRuns(silent=false) {
+  const res = await api('/eval/runs?limit=5');
+  if (!silent || (res.runs || []).length) {
+    document.getElementById('eval-results').innerHTML = (res.runs || []).map(r => `<div class="event"><b>${esc(r.run_id)}</b> ${badge(r.status || 'run')}<div class="muted">created=${fmtTime(r.created_at)} · pass=${num((((r.metrics || {}).pass_rate) || 0)*100,0)}% · score=${num(((r.metrics || {}).score) || 0,2)}</div></div>`).join('') || '<div class="empty">暂无历史 runs</div>';
+  }
+}
+
+async function loadPostmortems() {
+  const res = await api('/eval/postmortems?limit=10');
+  document.getElementById('eval-results').innerHTML = (res.postmortems || []).map(p => `<div class="event"><b>${esc(p.case_id || p.incident_id)}</b> ${badge('final ' + esc(p.final_score))}<div class="muted">reviewer=${esc(p.reviewer)} · created=${fmtTime(p.created_at)}</div><p>${esc(p.notes || '')}</p></div>`).join('') || '<div class="empty">暂无人工复盘评分</div>';
+}
+
+async function savePostmortem() {
+  const body = {
+    case_id: document.getElementById('pm-case').value,
+    incident_id: document.getElementById('pm-incident').value,
+    final_score: Number(document.getElementById('pm-score').value),
+    reviewer: document.getElementById('pm-reviewer').value || 'operator',
+    notes: document.getElementById('pm-notes').value,
+    labels: []
+  };
+  const res = await api('/eval/postmortem', {method:'POST', body: JSON.stringify(body)});
+  document.getElementById('pm-result').innerHTML = jsonBlock(res);
+}
+
+loadAll().catch(e => toast(e.message));
+</script>
+</body>
+</html>

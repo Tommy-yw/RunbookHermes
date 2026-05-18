@@ -1,0 +1,129 @@
+{
+  "version": 1,
+  "services": {
+    "payment-service": {
+      "service": "payment-service",
+      "owner": "payments-oncall",
+      "environment": "prod",
+      "dependencies": ["mysql-payment", "coupon-service", "order-service"],
+      "slo": {
+        "availability_target": 0.999,
+        "p95_latency_ms": 450,
+        "http_5xx_rate_threshold": 0.02
+      },
+      "observability": {
+        "prometheus_service_label": "service",
+        "loki_service_label": "service",
+        "trace_service_name": "payment-service"
+      },
+      "rollback": {
+        "preferred_backend": "argocd",
+        "kubernetes_workload_kind": "deployment",
+        "kubernetes_workload_name": "payment-service",
+        "kubernetes_container": "payment-service",
+        "image_repository": "registry.example.com/payments/payment-service",
+        "argocd_app": "payment-service-prod",
+        "safe_previous_revision": "v2.3.0",
+        "requires_approval": true,
+        "requires_checkpoint": true
+      },
+      "rca_rules": [
+        {
+          "rule_id": "payment_deploy_db_pool_regression",
+          "category": "deploy_db_regression",
+          "title": "Recent payment-service release is likely saturating the MySQL connection pool and returning HTTP 503",
+          "required_signals": ["deploy_recent", "http_503", "db_pool"],
+          "supporting_signals": ["mysql", "p95_latency", "trace_error"],
+          "base_confidence": 0.82
+        },
+        {
+          "rule_id": "payment_coupon_timeout",
+          "category": "coupon_timeout",
+          "title": "coupon-service timeout is likely causing payment-service HTTP 504 responses",
+          "required_signals": ["dependency_coupon", "http_504", "timeout"],
+          "supporting_signals": ["trace_error", "p95_latency"],
+          "base_confidence": 0.76
+        }
+      ],
+      "action_rules": {
+        "deploy_db_regression": {
+          "action_type": "rollback_canary",
+          "title_template": "Rollback {service} canary from {current_revision} to {target_revision}",
+          "risk_level": "destructive",
+          "target_revision_source": "deploy_previous_or_profile",
+          "observe_after": true
+        },
+        "coupon_timeout": {
+          "action_type": "scale_or_disable_coupon_path",
+          "title_template": "Route around or scale coupon-service before retrying payment requests",
+          "risk_level": "write_safe",
+          "target_service": "coupon-service"
+        }
+      }
+    },
+    "coupon-service": {
+      "service": "coupon-service",
+      "owner": "growth-oncall",
+      "dependencies": ["redis-coupon"],
+      "slo": {"p95_latency_ms": 300, "http_5xx_rate_threshold": 0.02},
+      "rollback": {
+        "preferred_backend": "kubernetes",
+        "kubernetes_workload_kind": "deployment",
+        "kubernetes_workload_name": "coupon-service",
+        "kubernetes_container": "coupon-service",
+        "safe_previous_revision": "v1.8.2",
+        "requires_approval": true,
+        "requires_checkpoint": true
+      },
+      "rca_rules": [
+        {
+          "rule_id": "coupon_redis_timeout",
+          "category": "coupon_timeout",
+          "title": "coupon-service timeout is likely linked to Redis latency or hot-key pressure",
+          "required_signals": ["http_504", "timeout"],
+          "supporting_signals": ["redis", "hot_key", "p95_latency"],
+          "base_confidence": 0.74
+        }
+      ],
+      "action_rules": {
+        "coupon_timeout": {
+          "action_type": "scale_or_disable_coupon_path",
+          "title_template": "Scale coupon-service or route around the coupon path",
+          "risk_level": "write_safe",
+          "target_service": "coupon-service"
+        }
+      }
+    },
+    "order-service": {
+      "service": "order-service",
+      "owner": "orders-oncall",
+      "dependencies": ["rate-limit-config", "redis-order"],
+      "slo": {"p95_latency_ms": 350, "http_429_rate_threshold": 0.05},
+      "rollback": {
+        "preferred_backend": "argocd",
+        "argocd_app": "order-service-prod",
+        "safe_previous_revision": "v4.1.7",
+        "requires_approval": true,
+        "requires_checkpoint": true
+      },
+      "rca_rules": [
+        {
+          "rule_id": "order_rate_limit",
+          "category": "order_rate_limit",
+          "title": "order-service rate limiting is likely causing HTTP 429 responses",
+          "required_signals": ["dependency_order", "http_429", "rate_limit"],
+          "supporting_signals": ["promo", "traffic_spike"],
+          "base_confidence": 0.74
+        }
+      ],
+      "action_rules": {
+        "order_rate_limit": {
+          "action_type": "adjust_rate_limit",
+          "title_template": "Review order-service rate-limit policy and temporarily raise the guarded limit",
+          "risk_level": "write_safe",
+          "target_service": "order-service"
+        }
+      }
+    }
+  }
+}

@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+from runbook_bootstrap import PROJECT_ROOT, bootstrap
+bootstrap()
+ROOT = PROJECT_ROOT
+
+import sys
+from pathlib import Path
+
+
 import argparse, json
 from runbook_hermes.gateway.server import main as gateway_main
 from runbook_hermes.gateway.alertmanager import normalize as alert
 from runbook_hermes.gateway.feishu import normalize_card_callback, normalize_event
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = PROJECT_ROOT
 
 def load(name):
     return json.loads((ROOT / "data" / "runbook_samples" / name).read_text())

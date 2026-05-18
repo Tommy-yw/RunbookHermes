@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+from runbook_bootstrap import PROJECT_ROOT, bootstrap
+bootstrap()
+ROOT = PROJECT_ROOT
+
+import sys
+from pathlib import Path
+
+
 import json
 import os
 import tempfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = PROJECT_ROOT
 
 
 def _exists(path: str) -> bool:
@@ -29,6 +37,9 @@ def main() -> None:
     with tempfile.TemporaryDirectory() as td:
         os.environ["RUNBOOK_STORE_DIR"] = td
         os.environ.setdefault("RUNBOOK_MODEL_ENABLED", "false")
+        os.environ["RUNBOOK_API_AUTH_ENABLED"] = "true"
+        os.environ["RUNBOOK_API_TOKEN"] = "validate-write-token"
+        os.environ["RUNBOOK_API_READ_ONLY_TOKEN"] = "validate-read-token"
         from runbook_hermes import monitoring
 
         live = monitoring.live_overview()
@@ -41,8 +52,9 @@ def main() -> None:
             from apps.runbook_api.app.main import app
 
             client = TestClient(app)
-            checks["api_monitoring_live"] = client.get("/monitoring/live").status_code == 200
-            checks["api_monitoring_service"] = client.get("/monitoring/services/payment-service").status_code == 200
+            headers = {"x-runbook-token": "validate-read-token"}
+            checks["api_monitoring_live"] = client.get("/monitoring/live", headers=headers).status_code == 200
+            checks["api_monitoring_service"] = client.get("/monitoring/services/payment-service", headers=headers).status_code == 200
             checks["api_monitoring_page"] = client.get("/web/monitoring.html").status_code == 200
         except ModuleNotFoundError as exc:
             if exc.name == "fastapi":
