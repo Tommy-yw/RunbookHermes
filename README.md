@@ -274,13 +274,6 @@ It supports inputs such as Grafana screenshots, Feishu alert cards, topology dia
 
 This is important for real SRE workflows because many incident clues appear first in dashboards, alert cards, topology screenshots, or shared chat images. RunbookHermes treats those materials as evidence sources instead of ignoring them or forcing operators to manually rewrite everything.
 
-### Knowledge Page Split
-
-![Knowledge Page Split](docs/assets/knowledge-split.png)
-
-The old combined knowledge page has been split into dedicated pages for RAG, Benchmark / Eval, Training / RL, and Multimodal Evidence.
-
-This split keeps the Web Console easier to operate: RAG is used for knowledge retrieval, Eval is used for quality measurement, Training is used for data generation and RL handoff, and Multimodal is used for visual evidence extraction.
 ---
 
 ## 3. 整体架构
